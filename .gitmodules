@@ -6,10 +6,10 @@
 	url = https://github.com/gabime/spdlog.git
 [submodule "libdwarfparser"]
 	path = libdwarfparser
-	url = https://github.com/scorpionzezz/libdwarfparser.git
+	url = https://github.com/ssentanoe/libdwarfparser
 [submodule "libvmi"]
 	path = libvmi
 	url = https://github.com/libvmi/libvmi.git
 [submodule "librdkafka"]
 	path = librdkafka
-	url = https://github.com/edenhill/librdkafka.git
+	url = https://github.com/edenhill/librdkafka
