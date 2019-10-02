@@ -12,7 +12,7 @@ Libvmtrace was used for the following research papers:
 * Architecture for Resource-Aware VMI-based Cloud Malware Analysis
 * Sarracenia: Enhancing the Performance and Stealthiness of SSH Honeypots Using Virtual Machine Introspection
 
-[![Build status](https://travis-ci.org/FelixBer/libvmtrace.svg?branch=master)](https://travis-ci.org/FelixBer/libvmtrace)
+[![Build status](https://travis-ci.org/libvmtrace/libvmtrace.svg?branch=master)](https://travis-ci.org/libvmtrace/libvmtrace)
 
 
 Installation
