@@ -1,0 +1,30 @@
+dist: bionic
+language: cpp
+sudo: true
+compiler: gcc
+
+before_install:
+    - sudo apt-get update -q
+install:
+    - sudo apt-get install -y -q libnetfilter-queue-dev libpcap-dev g++ libboost-all-dev automake libtool git libglib2.0-dev g++ libjson-c-dev libxen-dev byacc make netcat libelf-dev libssl-dev flex libdwarf-dev cmake flex bison libglib2.0-dev libvirt-dev libjson-c-dev libyajl-dev colormake libssh-dev libcurl4-openssl-dev uuid-dev
+script:
+    - git submodule init
+    - git submodule update
+    - cd libvmi
+    - mkdir build
+    - cd build
+    - cmake -DENABLE_KVM=OFF ..
+    - make
+    - sudo make install
+    - cd ../../librdkafka
+    - ./configure
+    - make
+    - sudo make install
+    - sudo ldconfig
+    - cd ..
+    - ./autogen.sh
+    - ./configure
+    - colormake
+after_script:
+    - make clean
+
