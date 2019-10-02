@@ -6,10 +6,10 @@ PLUGINS = plugins/SyscallLogger.cpp \
 	  plugins/ProcessListLogger.cpp \
 	  plugins/ProcessChangeLogger.cpp
 
-LDADD = -lm $(LIBS) $(GLIB_LIBS) $(DEPS_LDFLAGS) -lssl -lcrypto  -lboost_system -lboost_regex -lboost_filesystem -lboost_program_options -lcurl
-LDADD += -lvmtrace -lxentoollog -lxenctrl -lxenlight -ldwarf -lelf -lnetfilter_queue -lrdkafka++
+LDADD = -lm $(LIBS) $(GLIB_LIBS) $(DEPS_LDFLAGS) -lssl -lcrypto  -lboost_system -lboost_regex -lboost_filesystem -lboost_program_options
+LDADD += -lvmtrace -lxentoollog -lxenctrl -lxenlight -ldwarf -lelf -lnetfilter_queue -lrdkafka++ -lcurl
 
-bin_PROGRAMS = saracenia_app saracenia2_app dingfest_app code_section_integrity_app code_section_integrity_binary_app git_detect_app measurment_app measurment_pf_app ssh_key_extraction_app csec_app
+bin_PROGRAMS = saracenia_app saracenia2_app dingfest_app code_section_integrity_app code_section_integrity_binary_app git_detect_app ssh_key_extraction_app csec_app
 
 saracenia_app_SOURCES = saracenia.cpp \
 						ssh_helper/SSHHelper.cpp
@@ -20,10 +20,6 @@ saracenia2_app_SOURCES = saracenia2.cpp \
 saracenia2_app_LDADD = $(LDADD) -lssh
 
 dingfest_app_SOURCES = dingfest.cpp $(PLUGINS)
-
-measurment_app_SOURCES = measurment.cpp $(PLUGINS)
-
-measurment_pf_app_SOURCES = measurment_pf.cpp $(PLUGINS)
 
 code_section_integrity_app_SOURCES = code_section_integrity.cpp
 code_section_integrity_app_LDADD = $(LDADD)

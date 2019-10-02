@@ -24,7 +24,8 @@ Clone and Submodules
 ============
 
 ```
-git clone <the repo>
+git clone https://github.com/libvmtrace/libvmtrace
+cd libvmtrace
 git submodule init
 git submodule update
 
@@ -35,7 +36,7 @@ cmake -DENABLE_KVM=OFF ..
 make
 make install
 
-cd ../librdkafka
+cd ../../librdkafka
 ./configure
 make
 make install
