@@ -92,8 +92,12 @@ bool SyscallLogger::callback(const Event* ev, void* data)
 
 	if(s->GetNr() == 2)
 	{
-		string path(document["path"].GetString());
-		string pwd(document["pwd"].GetString());
+        	string path="EMPTY PATH";
+	        string pwd="EMPTY PWD";
+	        if (document.HasMember("path"))
+        	    path = document["path"].GetString();
+	        if (document.HasMember("pwd"))
+        	    pwd = document["pwd"].GetString();
 
 		string fullPath = path;
 		if(!path.empty())
