@@ -1,0 +1,20 @@
+diff a/src/sys/LinuxVM.cpp b/src/sys/LinuxVM.cpp	(rejected hunks)
+@@ -1661,14 +1661,14 @@ void LinuxVM::Stop()
+ 		}
+ 	}
+ 
+-	if(_sm->GetRM() != nullptr)
++	if(_sm->GetBPM() != nullptr)
+ 	{
+-		_sm->GetRM()->DeInit();
++		_sm->GetBPM()->DeInit();
+ 	}
+ 
+-	if(_sm->GetBPM() != nullptr)
++	if(_sm->GetRM() != nullptr)
+ 	{
+-		_sm->GetBPM()->DeInit();
++		_sm->GetRM()->DeInit();
+ 	}
+ 
+ 	_sm->Unlock();
