@@ -1661,14 +1661,14 @@ void LinuxVM::Stop()
 		}
 	}
 
-	if(_sm->GetRM() != nullptr)
-	{
-		_sm->GetRM()->DeInit();
-	}
-
 	if(_sm->GetBPM() != nullptr)
 	{
 		_sm->GetBPM()->DeInit();
+	}
+	
+	if(_sm->GetRM() != nullptr)
+	{
+		_sm->GetRM()->DeInit();
 	}
 
 	_sm->Unlock();
