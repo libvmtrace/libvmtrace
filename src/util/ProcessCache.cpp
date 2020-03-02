@@ -117,14 +117,14 @@ namespace libvmtrace
 		}
 	}
 
-	const Process& ProcessCache::GetProcessFromTCPConnection(const NetworkConnection* con)
+	const Process& ProcessCache::GetProcessFromTCPConnection(const net::NetworkConnection* con)
 	{
 		{
 			lock_guard<recursive_mutex> lock(_lock);
 			for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
 			{
-				vector<NetworkConnection> tcpconnections = _os.GetNetworkConnections(*it, TCP);
-				for(vector<NetworkConnection>::iterator it2 = tcpconnections.begin() ; it2 != tcpconnections.end(); ++it2)
+				vector<net::NetworkConnection> tcpconnections = _os.GetNetworkConnections(*it, TCP);
+				for(vector<net::NetworkConnection>::iterator it2 = tcpconnections.begin() ; it2 != tcpconnections.end(); ++it2)
 				{
 					if((*it2) == *con)
 					{
@@ -140,8 +140,8 @@ namespace libvmtrace
 			lock_guard<recursive_mutex> lock(_lock);
 			for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
 			{
-				vector<NetworkConnection> tcpconnections = _os.GetNetworkConnections(*it, TCP);
-				for(vector<NetworkConnection>::iterator it2 = tcpconnections.begin() ; it2 != tcpconnections.end(); ++it2)
+				vector<net::NetworkConnection> tcpconnections = _os.GetNetworkConnections(*it, TCP);
+				for(vector<net::NetworkConnection>::iterator it2 = tcpconnections.begin() ; it2 != tcpconnections.end(); ++it2)
 				{
 					if((*it2) == (*con))
 					{

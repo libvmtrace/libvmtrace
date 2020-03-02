@@ -26,10 +26,10 @@ int main(int argc, char* argv[])
 {
 	if (argc != 2)
 	{
-		cout << argv[0] << " <vmname>" << endl;
+		std::cout << argv[0] << " <vmname>" << std::endl;
 		return -1;
 	}
-	string vm_id = argv[1];
+	std::string vm_id = argv[1];
 
 	struct sigaction act;
 	act.sa_handler = close_handler;
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 	Controller c;
 	c.RegisterPlugin(sl);
 
-	vector<string> params1;
+	std::vector<std::string> params1;
 	params1.push_back("0");
 	params1.push_back("1");
 	params1.push_back("59");

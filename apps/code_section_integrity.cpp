@@ -5,6 +5,7 @@
 #include <chrono>
 
 using namespace std;
+using namespace rapidjson;
 using namespace libvmtrace;
 using namespace libvmtrace::util;
 

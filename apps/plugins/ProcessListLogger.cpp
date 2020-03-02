@@ -62,7 +62,7 @@ namespace libvmtrace
 	void LogProcessList(void *data)
 	{
 		ProcessListLogger* psl = (ProcessListLogger*)(data);
-		psl->ExecuteCommand("GetProcessList", vector<string>(), "0", psl->GetVmId());
+		psl->ExecuteCommand("GetProcessList", std::vector<std::string>(), "0", psl->GetVmId());
 	}
 }
 

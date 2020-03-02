@@ -21,10 +21,10 @@ namespace libvmtrace
 		if (buf == nullptr)
 		{
 			_pagefault = true;
-			return string("ERROR");
+			return std::string("ERROR");
 		}
 
-		string ret = escape_json(buf);
+		std::string ret = escape_json(buf);
 		free(buf);
 		return ret;
 	}
@@ -55,7 +55,7 @@ namespace libvmtrace
 
 		if ( size == read) 
 		{
-			std::string str = string(buf, size);
+			std::string str = std::string(buf, size);
 			str.erase(remove_if(str.begin(), str.end(), invalidChar), str.end());
 
 			std::string ret = escape_json(str);
@@ -220,7 +220,7 @@ namespace libvmtrace
 	void SyscallJson::ToJsonRead(vmi_instance_t vmi) 
 	{
 		int size =  SyscallBasic::GetRet();
-		size = min(size, 4096);
+		size = std::min(size, 4096);
 
 		_writer.Key("fd");
 		_writer.Uint(SyscallBasic::GetParameter(0));
@@ -391,7 +391,7 @@ namespace libvmtrace
 		_writer.Uint(SyscallBasic::GetRet());
 	}
 
-	const string SyscallJson::ToJson()
+	const std::string SyscallJson::ToJson()
 	{
 		_writer.EndObject();
 

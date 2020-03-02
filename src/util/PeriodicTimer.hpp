@@ -47,7 +47,7 @@ namespace util
 				}
 				catch(...)
 				{
-					cerr << "Could not call PeriodicTimer Callback" << endl;
+					std::cerr << "Could not call PeriodicTimer Callback" << std::endl;
 				}
 
 				auto end = std::chrono::high_resolution_clock::now();
@@ -55,11 +55,11 @@ namespace util
 	                        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
 
 				if (_time_ms - ms > 0)
-					std::this_thread::sleep_for(chrono::milliseconds(_time_ms - ms));
+					std::this_thread::sleep_for(std::chrono::milliseconds(_time_ms - ms));
 				else
 				{
 					std::cerr << "periodic timer: time too low " << ms << " < " << _time_ms << std::endl;
-					std::this_thread::sleep_for(chrono::milliseconds(_time_ms));
+					std::this_thread::sleep_for(std::chrono::milliseconds(_time_ms));
 				}
 			}
 		}

@@ -12,10 +12,8 @@ namespace helpers
 		_ctx_dtb.dtb = dtb;
 		_ctx_dtb.addr = vaddr;
 
-		if(vmi_read(vmi, &_ctx_dtb, sizeof(addr_t), &ret, NULL) == VMI_FAILURE)
-		{
+		if (vmi_read(vmi, &_ctx_dtb, sizeof(addr_t), &ret, NULL) == VMI_FAILURE)
 			return 0;
-		}
 
 		return ret;
 	}
@@ -27,10 +25,8 @@ namespace helpers
 		_ctx_dtb.dtb = dtb;
 		_ctx_dtb.addr = vaddr;
 
-		if(vmi_read(vmi, &_ctx_dtb, sizeof(size_t), &ret, NULL) == VMI_FAILURE)
-		{
+		if (vmi_read(vmi, &_ctx_dtb, sizeof(size_t), &ret, NULL) == VMI_FAILURE)
 			return 0;
-		}
 
 		return ret;
 	}
@@ -42,10 +38,8 @@ namespace helpers
 		_ctx_dtb.dtb = dtb;
 		_ctx_dtb.addr = vaddr;
 
-		if(vmi_read(vmi, &_ctx_dtb, 1, &ret, NULL) == VMI_FAILURE)
-		{
+		if (vmi_read(vmi, &_ctx_dtb, 1, &ret, NULL) == VMI_FAILURE)
 			return 0;
-		}
 
 		return ret;
 	}
@@ -54,23 +48,19 @@ namespace helpers
 	{
 		addr_t ret = 0;
 
-		if(vmi_pagetable_lookup(vmi, dtb, vaddr, &ret) == VMI_FAILURE)
-		{
+		if (vmi_pagetable_lookup(vmi, dtb, vaddr, &ret) == VMI_FAILURE)
 			return 0;
-		}
 
 		return ret;
 	}
 
-	status_t SSHHelper::GetChar(vmi_instance_t vmi, addr_t dtb, addr_t vaddr, void *buf, size_t count)
+	status_t SSHHelper::GetChar(vmi_instance_t vmi, addr_t dtb, addr_t vaddr, void* buf, size_t count)
 	{ 
 		_ctx_dtb.dtb = dtb;
 		_ctx_dtb.addr = vaddr;
 
-		if(vmi_read(vmi, &_ctx_dtb, count, buf, NULL) == VMI_FAILURE)
-		{
+		if (vmi_read(vmi, &_ctx_dtb, count, buf, NULL) == VMI_FAILURE)
 			return VMI_FAILURE;
-		}
 
 		return VMI_SUCCESS;
 	}
@@ -81,23 +71,19 @@ namespace helpers
 		_ssh_session = ssh_new();
 		if(_ssh_session == NULL)
 		{
-			cerr << "unable to create ssh" << endl;
+			std::cerr << "unable to create ssh" << std::endl;
 			return;
 		}
 
 		ssh_options_set(_ssh_session, SSH_OPTIONS_HOST, _ip.c_str());
 		ssh_options_set(_ssh_session, SSH_OPTIONS_USER, "root");
 		rc = ssh_connect(_ssh_session);
-		if(rc != SSH_OK)
-		{
-			cout << "ssh connect error : " << ssh_get_error(_ssh_session) << endl;
-		}
+		if (rc != SSH_OK)
+			std::cout << "ssh connect error : " << ssh_get_error(_ssh_session) << std::endl;
 
 		rc = ssh_userauth_password(_ssh_session, NULL, "1234");
-		if(rc != SSH_AUTH_SUCCESS)
-		{
-			cout << "ssh auth error : " << ssh_get_error(_ssh_session) << endl;
-		}
+		if (rc != SSH_AUTH_SUCCESS)
+			std::cout << "ssh auth error : " << ssh_get_error(_ssh_session) << std::endl;
 
 		ssh_disconnect(_ssh_session);
 		ssh_free(_ssh_session);
@@ -118,42 +104,42 @@ namespace helpers
 		auth_password_pa = lvm->GetSymbolAddrPa(_binary_path, p, "auth_password");
 		if(auth_password_pa == 0)
 		{
-			cout << "Page fault : auth_password_pa" << endl;
+			std::cout << "Page fault : auth_password_pa" << std::endl;
 			lvm->PopulatePageFaultAdress(p.GetPid(), kex_derive_keys_va, &_pfl);
 		}
 
 		kex_derive_keys_pa = lvm->GetSymbolAddrPa(_binary_path, p, "kex_derive_keys");
 		if(kex_derive_keys_pa == 0)
 		{
-			cout << "Page fault : kex_derive_keys_pa" << endl;
+			std::cout << "Page fault : kex_derive_keys_pa" << std::endl;
 			lvm->PopulatePageFaultAdress(p.GetPid(), kex_derive_keys_va, &_pfl);
 		}
 
 		do_authentiation2_pa = lvm->GetSymbolAddrPa(_binary_path, p, "do_authentication2");
 		if(do_authentiation2_pa == 0)
 		{
-			cout << "Page fault : do_authentiation2_pa" << endl;
+			std::cout << "Page fault : do_authentiation2_pa" << std::endl;
 			lvm->PopulatePageFaultAdress(p.GetPid(), do_authentiation2_va, &_pfl);
 		}
 
 		sshbuf_get_u8_pa = lvm->GetSymbolAddrPa(_binary_path, p, "sshbuf_get_u8");
 		if(sshbuf_get_u8_pa == 0)
 		{
-			cout << "Page fault : sshbuf_get_u8_pa" << endl;
+			std::cout << "Page fault : sshbuf_get_u8_pa" << std::endl;
 			lvm->PopulatePageFaultAdress(p.GetPid(), sshbuf_get_u8_va, &_pfl);
 		}
 
 		ssh_packet_send2_wrapped_pa = lvm->GetSymbolAddrPa(_binary_path, p, "ssh_packet_send2_wrapped");
 		if(ssh_packet_send2_wrapped_pa == 0)
 		{
-			cout << "Page fault : ssh_packet_send2_wrapped_pa" << endl;
+			std::cout << "Page fault : ssh_packet_send2_wrapped_pa" << std::endl;
 			lvm->PopulatePageFaultAdress(p.GetPid(), ssh_packet_send2_wrapped_va, &_pfl);
 		}
 
 		channel_connect_to_port_pa = lvm->GetSymbolAddrPa(_binary_path, p, "channel_connect_to_port");
 		if(channel_connect_to_port_pa == 0)
 		{
-			cout << "Page fault : channel_connect_to_port_pa" << endl;
+			std::cout << "Page fault : channel_connect_to_port_pa" << std::endl;
 			lvm->PopulatePageFaultAdress(p.GetPid(), channel_connect_to_port_va, &_pfl);
 		}
 

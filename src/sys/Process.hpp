@@ -26,11 +26,11 @@ namespace libvmtrace
 		addr_t start, end;
 		addr_t flags;
 		addr_t pg_off;
-		string path;
-		string sha256_hash;
-		string mmap_data_full;
-		string str_hexdump;
-		string access;
+		std::string path;
+		std::string sha256_hash;
+		std::string mmap_data_full;
+		std::string str_hexdump;
+		std::string access;
 	};
 
 	class Process 
@@ -101,12 +101,12 @@ namespace libvmtrace
 				return _mmaps;
 			}
 
-			void SetTCPConnections(std::vector<NetworkConnection*>* conns) 
+			void SetTCPConnections(std::vector<net::NetworkConnection*>* conns) 
 			{ 
 				tcp_connections_ = conns;
 			}
 
-			std::vector<NetworkConnection*>* GetTCPConnections() const 
+			std::vector<net::NetworkConnection*>* GetTCPConnections() const 
 			{
 				return tcp_connections_;
 			}
@@ -121,8 +121,8 @@ namespace libvmtrace
 				return _parent_pid; 
 			}
 
-			std::map<string, string> GetStringMap();
-			std::map<string, int> GetIntMap();
+			std::map<std::string, std::string> GetStringMap();
+			std::map<std::string, int> GetIntMap();
 			rapidjson::Value ToJson(rapidjson::Document::AllocatorType& allocator);
 			//Json::Object ToMemoryMapsJson();
 		 
@@ -136,7 +136,7 @@ namespace libvmtrace
 			int _uid;
 			const std::string _pwd;
 			std::vector<struct vm_area>* _mmaps;
-			std::vector<NetworkConnection*>* tcp_connections_;
+			std::vector<net::NetworkConnection*>* tcp_connections_;
 	};
 }
 

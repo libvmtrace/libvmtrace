@@ -5,6 +5,8 @@
 
 namespace libvmtrace
 {
+	using namespace std; 
+
 	// mov rax rbx
 	// static char code[] = "\x48\x8B\x03";
 
@@ -233,9 +235,9 @@ namespace libvmtrace
 		return return_value;
 	}
 
-	vector <NetworkConnection> LinuxVM::GetNetworkConnections(const Process& p, const ConnectionType type)
+	vector<net::NetworkConnection> LinuxVM::GetNetworkConnections(const Process& p, const ConnectionType type)
 	{
-		vector<NetworkConnection> networkconnections;
+		vector<net::NetworkConnection> networkconnections;
 
 		vmi_instance_t vmi = _sm->Lock();
 
@@ -309,7 +311,7 @@ namespace libvmtrace
 
 				if(family == AF_INET)
 				{
-					NetworkConnection t(family, sock_type, (struct in_addr*)&saddr, (struct in_addr*)&daddr, sport, ntohs(dport));
+					net::NetworkConnection t(family, sock_type, (struct in_addr*)&saddr, (struct in_addr*)&daddr, sport, ntohs(dport));
 					networkconnections.push_back(t);
 				}
 				else if(family == AF_INET6)

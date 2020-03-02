@@ -10,24 +10,22 @@ namespace libvmtrace
 	class SyscallLogger : public util::Plugin, public EventListener
 	{
 		public:
-			SyscallLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log)
+			SyscallLogger(std::string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log)
 				: SyscallLogger(vm_id, os, pc, log, true, true) { };
 
-			SyscallLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log, bool json, bool return_value)
+			SyscallLogger(std::string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log, bool json, bool return_value)
 				: _vm_id(vm_id), _os(os), _pc(pc), _log(log), _json(json), _return_value(return_value)
 			{
 				_commands.push_back("Trace");
 				_commands.push_back("Untrace");
 
 				for (int i = 0; i < 600; i++)
-				{
 					_events[i] = nullptr;
-				}
 
 				_log_name = "sys_syscall_"+vm_id;
 			}
 
-			const std::string ExecuteCommand(const string command, const std::vector<string> params,
+			const std::string ExecuteCommand(const std::string command, const std::vector<std::string> params,
 								const std::string command_id, const std::string vm_id);
 
 			const std::string GetName() const
@@ -35,14 +33,14 @@ namespace libvmtrace
 				return "SyscallLogger";
 			}
 
-			const std::vector<string> GetListCommands() const
+			const std::vector<std::string> GetListCommands() const
 			{
 				return _commands;
 			}
 
 			const void Stop()
 			{
-				cout << "STOP" << endl;
+				std::cout << "STOP" << std::endl;
 			}
 
 			bool callback(const Event* ev, void* data);
@@ -56,7 +54,7 @@ namespace libvmtrace
 			bool _json;
 			bool _return_value;
 
-			std::vector<string> _commands;
+			std::vector<std::string> _commands;
 			std::string _log_name;
 	};
 }

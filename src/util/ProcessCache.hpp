@@ -25,9 +25,9 @@ namespace libvmtrace
 			const vmi_pid_t FindParentProcessPidByPid(const int pid, const int mainpid);
 
 			// refresh list if the found process has same name as input, especially when process just fork
-			const Process& GetProcessFromDtbAndRefreshIf(const addr_t dtb, const string name);
-			const Process& GetProcessFromPidAndRefreshIf(const vmi_pid_t pid, const string name);
-			const Process& GetProcessFromTCPConnection(const NetworkConnection* con);
+			const Process& GetProcessFromDtbAndRefreshIf(const addr_t dtb, const std::string name);
+			const Process& GetProcessFromPidAndRefreshIf(const vmi_pid_t pid, const std::string name);
+			const Process& GetProcessFromTCPConnection(const net::NetworkConnection* con);
 
 			std::vector<Process> GetProcessesArray()
 			{

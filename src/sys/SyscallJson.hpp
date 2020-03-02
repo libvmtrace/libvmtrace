@@ -24,7 +24,7 @@ namespace libvmtrace
 			void PreProcess(const LinuxVM& lvm, uint64_t nr, vmi_instance_t vmi);
 			void PostProcess(const LinuxVM& lvm, unsigned int vcpu, vmi_instance_t, x86_registers_t* regs);
 
-			const string ToJson();
+			const std::string ToJson();
 			vmi_pid_t GetPid() const
 			{ 
 				return _pid; 
@@ -46,7 +46,7 @@ namespace libvmtrace
 			vmi_pid_t _pid;
 
 			rapidjson::StringBuffer _s;
-			rapidjson::Writer<StringBuffer> _writer;
+			rapidjson::Writer<rapidjson::StringBuffer> _writer;
 	};
 }
 

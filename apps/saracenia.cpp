@@ -18,8 +18,10 @@
 
 using namespace std;
 using namespace spdlog;
+using namespace rapidjson;
 using namespace libvmtrace;
 using namespace libvmtrace::util;
+using namespace libvmtrace::net;
 using namespace helpers;
 
 LinuxVM* _linux;

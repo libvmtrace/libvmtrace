@@ -28,8 +28,8 @@ namespace libvmtrace
 		addr_t target_dtb;
 		addr_t task_struct;
 
-		vector<addr_t> target_addrs;
-		vector<pair<addr_t, addr_t>> result_addrs;
+		std::vector<addr_t> target_addrs;
+		std::vector<std::pair<addr_t, addr_t>> result_addrs;
 
 		addr_t entry_addr;
 
@@ -57,7 +57,7 @@ namespace libvmtrace
 
 		x86_registers_t regs;
 
-		string command;
+		std::string command;
 
 		std::chrono::time_point<std::chrono::high_resolution_clock> start;
 		std::chrono::time_point<std::chrono::high_resolution_clock> start1;
@@ -67,7 +67,7 @@ namespace libvmtrace
 	{
 		public:
 			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson):
-								BreakpointEvent("syscall_"+to_string(nr)+(type == AFTER_CALL ? " after call" : ""),addr, el),
+								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
 								_nr(nr),
 								_type(type),
 								_is32bit(is32bit),
@@ -75,7 +75,7 @@ namespace libvmtrace
 								_syscall(nullptr) {}
 
 			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, SyscallBasic* s):
-								BreakpointEvent("syscall_"+to_string(nr)+(type == AFTER_CALL ? " after call" : ""),addr, el),
+								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
 								_nr(nr),
 								_type(type),
 								_is32bit(is32bit),
@@ -99,7 +99,7 @@ namespace libvmtrace
 
 	struct OpenFile
 	{
-		string path;
+		std::string path;
 		uint64_t fd;
 		uint32_t mode;
 		bool write;
@@ -137,10 +137,10 @@ namespace libvmtrace
 		public:
 			LinuxVM(SystemMonitor* sm);
 
-			vector<Process> GetProcessList();
-			vector <NetworkConnection> GetNetworkConnections(const Process& p, const ConnectionType type);
-			vector <OpenFile> GetOpenFiles(const Process& p);
-			vector<vm_area> GetMMaps(const Process& p);
+			std::vector<Process> GetProcessList();
+			std::vector<net::NetworkConnection> GetNetworkConnections(const Process& p, const ConnectionType type);
+			std::vector<OpenFile> GetOpenFiles(const Process& p);
+			std::vector<vm_area> GetMMaps(const Process& p);
 
 			status_t RegisterSyscall(SyscallEvent& ev);
 			status_t DeRegisterSyscall(SyscallEvent& ev);
@@ -156,18 +156,18 @@ namespace libvmtrace
 
 			void Stop();
 
-			addr_t GetSymbolAddrVa(const string binaryPath, const Process& p, const string symbolName);
-			addr_t GetSymbolAddrPa(const string binaryPath, const Process& p, const string symbolName);
+			addr_t GetSymbolAddrVa(const std::string binaryPath, const Process& p, const std::string symbolName);
+			addr_t GetSymbolAddrPa(const std::string binaryPath, const Process& p, const std::string symbolName);
 			
 			void PopulatePageFaultAdress(const vmi_pid_t pid, const addr_t target, EventListener* evl);
 			status_t InvokePageFault(uint64_t total_address_per_inst);
 
-			status_t InvokeCommand(const vmi_pid_t pid, string command, EventListener* evl);
+			status_t InvokeCommand(const vmi_pid_t pid, std::string command, EventListener* evl);
 
 			bool ProcessCR3CodeInjection(vmi_instance_t vmi, vmi_event_t *event);
 			bool ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi);
 
-			pair<addr_t, addr_t> GetCodeArea(vmi_pid_t pid);
+			std::pair<addr_t, addr_t> GetCodeArea(vmi_pid_t pid);
 		private:
 			addr_t _tgid_offset, _name_offset, _mm_offset, _tasks_offset, _parent_offset, _pgd_offset, _real_cred_offset, _uid_offset, _fs_offset, _pwd_offset;
 			addr_t _dentry_d_name_offset, _dentry_parent_offset;
@@ -179,28 +179,28 @@ namespace libvmtrace
 			addr_t _thread_struct_offset, _sp_offset, _sp0_offset, _sp_on_pt_regs_offset, _ip_on_pt_regs_offset, _current_task_offset;
 			addr_t _socket_type_offset, _socket_family;
 
-			string d_path(addr_t path, vmi_instance_t vmi);
+			std::string d_path(addr_t path, vmi_instance_t vmi);
 			uint32_t create_path(addr_t dentry, char* buf, vmi_instance_t vmi);
 
 			addr_t GetSyscallAddrVA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
 			addr_t GetSyscallAddrPA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
 
-			status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, string command, EventListener* evl);
+			status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, std::string command, EventListener* evl);
 
 			EventManager<int, const SyscallEvent*> _SyscallEvents64;
 			EventManager<int, const SyscallEvent*> _SyscallEvents32;
-			map<int, const SyscallBreakpoint> _Syscallbps64;
-			map<int, const SyscallBreakpoint> _Syscallbps32;
+			std::map<int, const SyscallBreakpoint> _Syscallbps64;
+			std::map<int, const SyscallBreakpoint> _Syscallbps32;
 			SyscallProcessor _syscallProc;
 
 			uint64_t _total_address_per_inst;
 
 			ElfHelper* _eh;
-			string _binaryPathTemp;
+			std::string _binaryPathTemp;
 			char* _binaryMap;
 
 			ProcessChangeEvent* _process_change;
-			vector<CodeInjection> _code_injections;
+			std::vector<CodeInjection> _code_injections;
 			CodeInjectionProcessorCr3 _code_injection_proc_cr3;
 			CodeInjectionProcessorInt3 _code_injection_proc_int3;
 	};

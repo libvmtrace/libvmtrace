@@ -24,6 +24,7 @@
 #include <ssh_helper/SSHHelper.hpp>
 
 using namespace std;
+using namespace rapidjson;
 using namespace libvmtrace;
 using namespace libvmtrace::util;
 using namespace helpers;

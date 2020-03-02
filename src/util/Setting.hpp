@@ -20,12 +20,12 @@ namespace util
 		{
 			std::ifstream ifs(path);
 			if (ifs.fail())
-				throw runtime_error("Setting file does not exist");
+				throw std::runtime_error("Setting file does not exist");
 
-			IStreamWrapper isw(ifs);
+			rapidjson::IStreamWrapper isw(ifs);
 			_document.ParseStream(isw);
 			if (_document.HasParseError())
-				throw runtime_error("Error parse setting file");
+				throw std::runtime_error("Error parse setting file");
 		}
 
 		std::string GetStringValue(std::string key)
@@ -61,7 +61,7 @@ namespace util
 			return _document[key.c_str()].GetDouble();
 		}
 
-		std::vector<string> GetArrayString(std::string key)
+		std::vector<std::string> GetArrayString(std::string key)
 		{
 			if (!_document.HasMember(key.c_str()))
 				throw std::runtime_error("Key : " + key + " not found");
@@ -82,7 +82,7 @@ namespace util
 
 			std::vector<int> ret;
 
-			for (SizeType i = 0; i < _document[key.c_str()].Size(); i++)
+			for (rapidjson::SizeType i = 0; i < _document[key.c_str()].Size(); i++)
 				if (_document[key.c_str()][i].IsInt())
 					ret.push_back(_document[key.c_str()][i].GetInt());
 

@@ -31,8 +31,8 @@ namespace libvmtrace
 				}	
 			}
 
-			const std::string ExecuteCommand(const string command, 
-							const std::vector<string> params,
+			const std::string ExecuteCommand(const std::string command, 
+							const std::vector<std::string> params,
 							const std::string command_id,
 							const std::string vm_id);
 
@@ -41,14 +41,14 @@ namespace libvmtrace
 				return "ProcessListLogger";
 			}
 
-			const std::vector<string> GetListCommands() const
+			const std::vector<std::string> GetListCommands() const
 			{
 				return _commands;
 			}
 
 			const void Stop()
 			{
-				cout << "STOP" << endl;
+				std::cout << "STOP" << std::endl;
 			}
 
 			std::string GetVmId()
@@ -64,7 +64,7 @@ namespace libvmtrace
 			ProcessCache& _pc;
 			util::Log& _log;
 
-			std::vector<string> _commands;
+			std::vector<std::string> _commands;
 			std::string _log_name;
 
 			util::PeriodicTimer* _pt;

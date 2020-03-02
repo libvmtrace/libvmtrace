@@ -15,7 +15,7 @@ namespace helpers
 		addr_t sshAddr;
 		time_t lastPacketSend;
 		vmi_pid_t sub_pid;
-		string username;
+		std::string username;
 		int tmp;
 		int authPass;
 		bool portForward;
@@ -25,8 +25,8 @@ namespace helpers
 	{
 		vmi_pid_t pid;
 		vmi_pid_t parent;
-		string name;
-		string path;
+		std::string name;
+		std::string path;
 		uint64_t fd;
 		bool fseek;
 		off_t offset;
@@ -37,15 +37,15 @@ namespace helpers
 		vmi_pid_t pid;
 		vmi_pid_t parent;
 		uint64_t fd;
-		string path;
+		std::string path;
 		bool checkpath;
 
-		writefind(vmi_pid_t pid,vmi_pid_t parent,uint64_t fd) : pid(pid),parent(parent),fd(fd),path(""),checkpath(false){}
-		writefind(vmi_pid_t pid,vmi_pid_t parent,uint64_t fd,string path) : pid(pid),parent(parent),fd(fd),path(path.empty() ? "EMPTY" : path),checkpath(true){}
+		writefind(vmi_pid_t pid, vmi_pid_t parent, uint64_t fd) : pid(pid),parent(parent),fd(fd),path(""),checkpath(false){}
+		writefind(vmi_pid_t pid, vmi_pid_t parent, uint64_t fd, std::string path) : pid(pid),parent(parent),fd(fd),path(path.empty() ? "EMPTY" : path),checkpath(true){}
 
 		bool operator()(const writefile& j) const 
 		{
-			if(!checkpath)
+			if (!checkpath)
 				return (j.pid == pid && j.parent == parent && j.fd == fd);
 			else
 				return (j.pid == pid && j.parent == parent && j.fd == fd && j.path == path);
@@ -64,7 +64,7 @@ namespace helpers
 	class SSHHelper
 	{
 		public:
-			SSHHelper(const std::string binary_path, const string ip) : _binary_path(binary_path), _ip(ip)
+			SSHHelper(const std::string binary_path, const std::string ip) : _binary_path(binary_path), _ip(ip)
 			{
 				_ctx_dtb.translate_mechanism = VMI_TM_PROCESS_DTB;
 			};

@@ -12,10 +12,8 @@ namespace libvmtrace
 		Document::AllocatorType& allocator = document.GetAllocator();
 		Value array(kArrayType);
 
-		for(vector<Process>::iterator it = processes.begin() ; it != processes.end(); ++it)
-		{
+		for(std::vector<Process>::iterator it = processes.begin() ; it != processes.end(); ++it)
 			array.PushBack((*it).ToJson(allocator), allocator);
-		}
 
 		document.AddMember("processes", array, allocator);
 		StringBuffer s;
