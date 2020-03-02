@@ -1,19 +1,24 @@
-#include "sys/DwarfHelper.hpp"
 
-DwarfHelper::DwarfHelper(string binaryPath)
-{
-	DwarfParser::parseDwarfFromFilename(binaryPath.c_str(), &_mgr);
-	_structNameTemp = "";
-}
+#include <sys/DwarfHelper.hpp>
 
-addr_t DwarfHelper::getVariableOffset(string structName, string variableName)
+namespace libvmtrace
 {
-	if(_structNameTemp.compare(structName) != 0)
+	DwarfHelper::DwarfHelper(std::string binaryPath)
 	{
-		_bt = _mgr.findBaseTypeByName<Structured>(structName);
-		_structPtr = dynamic_cast<Struct *>(_bt);
-		_structNameTemp = structName;
+		DwarfParser::parseDwarfFromFilename(binaryPath.c_str(), &_mgr);
+		_structNameTemp = "";
 	}
-	
-	return _structPtr->memberOffset(variableName);
+
+	addr_t DwarfHelper::getVariableOffset(std::string structName, std::string variableName)
+	{
+		if(_structNameTemp.compare(structName) != 0)
+		{
+			_bt = _mgr.findBaseTypeByName<Structured>(structName);
+			_structPtr = dynamic_cast<Struct *>(_bt);
+			_structNameTemp = structName;
+		}
+		
+		return _structPtr->memberOffset(variableName);
+	}
 }
+

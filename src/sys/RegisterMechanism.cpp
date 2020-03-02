@@ -44,7 +44,7 @@ namespace libvmtrace
 		}
 		else
 		{
-			throw runtime_error("System Monitor is not yet initialized");
+			throw std::runtime_error("System Monitor is not yet initialized");
 		
 		return VMI_FAILURE;
 		}

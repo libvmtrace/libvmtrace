@@ -7,13 +7,13 @@
 
 namespace libvmtrace
 {
-	class SyscallLogger : public Plugin, public EventListener
+	class SyscallLogger : public util::Plugin, public EventListener
 	{
 		public:
-			SyscallLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, Log& log)
+			SyscallLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log)
 				: SyscallLogger(vm_id, os, pc, log, true, true) { };
 
-			SyscallLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, Log& log, bool json, bool return_value)
+			SyscallLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log, bool json, bool return_value)
 				: _vm_id(vm_id), _os(os), _pc(pc), _log(log), _json(json), _return_value(return_value)
 			{
 				_commands.push_back("Trace");
@@ -52,7 +52,7 @@ namespace libvmtrace
 			OperatingSystem& _os;
 			SyscallEvent* _events[600];
 			ProcessCache& _pc;
-			Log& _log;
+			util::Log& _log;
 			bool _json;
 			bool _return_value;
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 using namespace libvmtrace;
+using namespace libvmtrace::util;
 using namespace std;
 
 static bool interrupted = false;

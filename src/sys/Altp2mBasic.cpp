@@ -24,27 +24,25 @@ namespace libvmtrace
 	{
 
 #ifdef VMTRACE_DEBUG
-		cout << "removing bp @ " << hex << paddr << endl;
+		std::cout << "removing bp @ " << hex << paddr << std::endl;
 #endif
 
 		// All events are deregistered at this BP now. Remove the BP
-		for(vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end();)
+		for(std::vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end();)
 		{
 			//cout << "loop" << endl;
-			map<addr_t, addr_t>::iterator it2;
+			std::map<addr_t, addr_t>::iterator it2;
 			it2 = (*it).addrs.find(paddr);
 			if(it2 != (*it).addrs.end())
 			{
-				map<addr_t, uint8_t>::iterator it3;
+				std::map<addr_t, uint8_t>::iterator it3;
 				it3 = _SavedInstructions.find(it2->first);
 
 				uint8_t instr = it3->second;
 
 				size_t written = 0;
 				if (vmi_write_pa (vmi, it2->second, 1, &instr, &written) == VMI_FAILURE && written != 1)
-				{
-					throw runtime_error("Could not write BP");
-				}
+					throw std::runtime_error("Could not write BP");
 
 				_SavedInstructions.erase(it3);
 				(*it).addrs.erase(it2);
@@ -58,15 +56,13 @@ namespace libvmtrace
 				_xen->DestroyPage(&((*it).remapped));
 
 #ifdef VMTRACE_DEBUG
-		cout << "destroying page @ " << hex << (*it).remapped << " orig @ " << (*it).original << endl;
+				std::cout << "destroying page @ " << hex << (*it).remapped << " orig @ " << (*it).original << std::endl;
 #endif
 
 				it = _remmaped_gfns.erase(it);
 			}
 			else
-			{
 				++it;
-			}
 		}
 	}
 
@@ -81,7 +77,7 @@ namespace libvmtrace
 		vmi_pagetable_lookup(vmi, bpd->regs.cr3 , rip, &rip_pa);
 
 #ifdef VMTRACE_DEBUG
-		cout << "ProcessBPSingleStepCB @ " << hex << paddr << endl;
+		std::cout << "ProcessBPSingleStepCB @ " << hex << paddr << std::endl;
 #endif
 
 		if(!GetSystemMonitor().IsExcludeAddress(rip_pa))
@@ -94,12 +90,10 @@ namespace libvmtrace
 		}
 
 		if (_BPEvents.GetCount(paddr) == 0)
-		{
 			RemoveBreakpointPa(vmi, paddr);
-		}
 
 #ifdef VMTRACE_DEBUG
-		cout << "\tswitch to view " << dec << _view_x << endl;
+		std::cout << "\tswitch to view " << std::dec << _view_x << std::endl;
 #endif
 
 		event->slat_id = _view_x;
@@ -153,7 +147,7 @@ namespace libvmtrace
 		bpd->paddr = paddr;
 
 #ifdef VMTRACE_DEBUG
-		cout << "ProcessBreakpointEvent @ " << hex << paddr << endl;
+		std::cout << "ProcessBreakpointEvent @ " << hex << paddr << std::endl;
 #endif
 
 		event->interrupt_event.reinject = 0;
@@ -168,7 +162,7 @@ namespace libvmtrace
 		}
 
 #ifdef VMTRACE_DEBUG
-		cout << "\tswitch to view 0" << endl;
+		std::cout << "\tswitch to view 0" << std::endl;
 #endif
 
 		event->slat_id = 0;
@@ -188,12 +182,12 @@ namespace libvmtrace
 		if(gfn == _zero_page_gfn)
 		{
 #ifdef VMTRACE_DEBUG
-			cout << "somebody try to read / write to the empty page" << endl;
+			std::cout << "somebody try to read / write to the empty page" << std::endl;
 #endif
 			return VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
 		}
 
-		vector<remmaped_gfn>::iterator it = find_if(_remmaped_gfns.begin(), _remmaped_gfns.end(), boost::bind(&remmaped_gfn::remapped, _1) == gfn);
+		std::vector<remmaped_gfn>::iterator it = find_if(_remmaped_gfns.begin(), _remmaped_gfns.end(), boost::bind(&remmaped_gfn::remapped, _1) == gfn);
 		if (it != _remmaped_gfns.end())
 		{
 			event->slat_id = _view_r;
@@ -201,7 +195,7 @@ namespace libvmtrace
 			_step_events[event->vcpu_id].data = (void*) this;
 
 #ifdef VMTRACE_DEBUG
-			cout << "somebody try to read / write to the shadow copy page" << endl;
+			std::cout << "somebody try to read / write to the shadow copy page" << std::endl;
 #endif
 
 			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID | VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
@@ -219,13 +213,13 @@ namespace libvmtrace
 		if(GetSystemMonitor().GetBPMType() != ALTP2M)
 		{
 			GetSystemMonitor().Stop();
-			throw runtime_error("Not match BPM type");
+			throw std::runtime_error("Not match BPM type");
 			return VMI_FAILURE;
 		}
 
 		if(!GetSystemMonitor().IsInitialized())
 		{
-			throw runtime_error("System Monitor is not yet initialized");
+			throw std::runtime_error("System Monitor is not yet initialized");
 			return VMI_FAILURE;
 		}
 
@@ -243,14 +237,14 @@ namespace libvmtrace
 		_xen->CreateNewPage(&_zero_page_gfn);
 
 #ifdef VMTRACE_DEBUG
-		cout << "zero page gfn : " << hex << _zero_page_gfn << endl;
+		std::cout << "zero page gfn : " << hex << _zero_page_gfn << std::endl;
 #endif
 
 		uint8_t fmask[VMI_PS_4KB] = {0xFF};
-		fill_n(fmask, VMI_PS_4KB, 0xFF);
+		std::fill_n(fmask, VMI_PS_4KB, 0xFF);
 		if (VMI_FAILURE == vmi_write_pa(vmi, _zero_page_gfn<<12, VMI_PS_4KB, &fmask, NULL))
 		{
-			throw runtime_error("Failed to mask zero page with FF");
+			throw std::runtime_error("Failed to mask zero page with FF");
 			return VMI_FAILURE;
 		}
 
@@ -259,19 +253,19 @@ namespace libvmtrace
 		rc = vmi_slat_set_domain_state(vmi, 1);
 		if (rc < 0)
 		{
-			throw runtime_error("Failed to change domain state");
+			throw std::runtime_error("Failed to change domain state");
 			return VMI_FAILURE;
 		}
 
 		if(vmi_slat_create(vmi, &_view_x) == VMI_FAILURE)
 		{
-			throw runtime_error("Failed to create view X");
+			throw std::runtime_error("Failed to create view X");
 			return VMI_FAILURE;
 		}
 
 		if(vmi_slat_create(vmi, &_view_r) == VMI_FAILURE)
 		{
-			throw runtime_error("Failed to create view R");
+			throw std::runtime_error("Failed to create view R");
 			return VMI_FAILURE;
 		}
 
@@ -303,13 +297,13 @@ namespace libvmtrace
 	{
 		vmi_instance_t vmi = GetSystemMonitor().Lock();
 
-		for(vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end(); ++it)
+		for(std::vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end(); ++it)
 		{
 			vmi_slat_change_gfn(vmi, _view_x, (*it).original, ~0);
 			vmi_slat_change_gfn(vmi, _view_r, (*it).remapped, ~0);
 
 #ifdef VMTRACE_DEBUG
-		cout << "destroying page @ " << hex << (*it).remapped << " orig @ " << (*it).original << endl;
+			std::cout << "destroying page @ " << hex << (*it).remapped << " orig @ " << (*it).original << std::endl;
 #endif
 
 			_xen->DestroyPage(&((*it).remapped));
@@ -328,7 +322,7 @@ namespace libvmtrace
 
 		_xen->SetMaxMem(_init_memsize);
 
-		cout << "Counter : " << dec << GetCounter() << endl;
+		std::cout << "Counter : " << std::dec << GetCounter() << std::endl;
 
 		delete _xen;
 
@@ -345,7 +339,7 @@ namespace libvmtrace
 		addr_t current_gfn = addr >> 12;
 
 #ifdef VMTRACE_DEBUG
-		cout << "adding BP @" << hex << addr << " for : " << ev->GetName() << endl;
+		std::cout << "adding BP @" << hex << addr << " for : " << ev->GetName() << std::endl;
 #endif
 
 		_BPEvents.RegisterEvent(addr, ev);
@@ -353,29 +347,27 @@ namespace libvmtrace
 		{
 			if (vmi_read_8_pa (vmi, addr, &instr))
 			{
-			success = VMI_FAILURE;
-			throw runtime_error("Could not read instruction");
+				success = VMI_FAILURE;
+				throw std::runtime_error("Could not read instruction");
 			}
 
-			_SavedInstructions.insert(pair<addr_t, uint8_t>(addr, instr));
+			_SavedInstructions.insert(std::pair<addr_t, uint8_t>(addr, instr));
 
-			vector<remmaped_gfn>::iterator it = find_if(_remmaped_gfns.begin(), _remmaped_gfns.end(), boost::bind(&remmaped_gfn::original, _1) == current_gfn);
+			std::vector<remmaped_gfn>::iterator it = find_if(_remmaped_gfns.begin(), _remmaped_gfns.end(), boost::bind(&remmaped_gfn::original, _1) == current_gfn);
 			if (it != _remmaped_gfns.end())
 			{
 				addr_t remapped_gfn = (*it).remapped;
 
 				addr_t remmaped_addr = (remapped_gfn << 12) + (addr & VMI_BIT_MASK(0, 11));
 				if(vmi_write_8_pa(vmi, remmaped_addr, &int3) == VMI_FAILURE)
-				{
-					throw runtime_error("Could not write BP");
-				}
+					throw std::runtime_error("Could not write BP");
 
 				IncreaseCounter();
 
-				(*it).addrs.insert(pair<addr_t, addr_t>(addr, remmaped_addr));
+				(*it).addrs.insert(std::pair<addr_t, addr_t>(addr, remmaped_addr));
 
 #ifdef VMTRACE_DEBUG
-				cout << "\texist : " << hex << "current gfn " << current_gfn << " remapped gfn " << remapped_gfn << " remmaped_addr " << remmaped_addr << endl;
+				std::cout << "\texist : " << hex << "current gfn " << current_gfn << " remapped gfn " << remapped_gfn << " remmaped_addr " << remmaped_addr << endl;
 #endif
 			}
 			else
@@ -399,17 +391,15 @@ namespace libvmtrace
 
 				addr_t remmaped_addr = (remapped_gfn<<12) + (addr & VMI_BIT_MASK(0,11));
 				if(vmi_write_8_pa(vmi, remmaped_addr, &int3) == VMI_FAILURE)
-				{
-					throw runtime_error("Could not write BP");
-				}
+					throw std::runtime_error("Could not write BP");
 
-				rg.addrs.insert(pair<addr_t, addr_t>(addr, remmaped_addr));
+				rg.addrs.insert(std::pair<addr_t, addr_t>(addr, remmaped_addr));
 				_remmaped_gfns.push_back(rg);
 
 				IncreaseCounter();
 
 #ifdef VMTRACE_DEBUG
-				cout << "\tnew : " << hex << "current gfn " << current_gfn << " remapped gfn " << remapped_gfn << " remmaped_addr " << remmaped_addr << endl;
+				std::cout << "\tnew : " << hex << "current gfn " << current_gfn << " remapped gfn " << remapped_gfn << " remmaped_addr " << remmaped_addr << std::endl;
 #endif
 			}
 		}
@@ -443,26 +433,19 @@ namespace libvmtrace
 
 		addr_t addr = ev->GetAddr();
 
-		for(vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end(); ++it)
+		for(std::vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end(); ++it)
 		{
-			//cout << "loop" << endl;
-			map<addr_t, addr_t>::iterator it2;
+			std::map<addr_t, addr_t>::iterator it2;
 			it2 = (*it).addrs.find(addr);
 			if(it2 != (*it).addrs.end())
 			{
 				vmi_slat_change_gfn(vmi, _view_x, (*it).original, ~0);
 				vmi_slat_change_gfn(vmi, _view_r, (*it).remapped, ~0);
 				break;
-				// size_t written = 0;
-				// if (vmi_write_pa (vmi, it2->second, 1, &int3, &written) == VMI_SUCCESS && written == 1)
-				// {
-				// 	break;			
-				// }
 			}
 		}
 
 		GetSystemMonitor().Unlock();
-
 		return success;
 	}
 
@@ -472,23 +455,15 @@ namespace libvmtrace
 
 		addr_t addr = ev->GetAddr();
 
-		// cout << "reinject" << hex << addr << endl;
-
-		for(vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end(); ++it)
+		for(std::vector<remmaped_gfn>::iterator it = _remmaped_gfns.begin(); it != _remmaped_gfns.end(); ++it)
 		{
-			//cout << "loop" << endl;
-			map<addr_t, addr_t>::iterator it2;
+			std::map<addr_t, addr_t>::iterator it2;
 			it2 = (*it).addrs.find(addr);
 			if(it2 != (*it).addrs.end())
 			{
 				vmi_slat_change_gfn(vmi, _view_x, (*it).original, (*it).remapped);
 				vmi_slat_change_gfn(vmi, _view_r, (*it).remapped, _zero_page_gfn);
 				break;
-				// size_t written = 0;
-				// if (vmi_write_pa (vmi, it2->second, 1, &int3, &written) == VMI_SUCCESS && written == 1)
-				// {
-				// 	break;			
-				// }
 			}
 		}
 

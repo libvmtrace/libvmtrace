@@ -1,6 +1,6 @@
+
 #ifndef __UTILS_H
 #define __UTILS_H
-#define HEXDUMP_COLS 16
 
 #include <string>
 #include <chrono>
@@ -8,41 +8,47 @@
 #include <iomanip>
 #include <sstream>
 
-using namespace std;
-
-string  hex_encode(uint8_t* key,unsigned int k);
-string  hex_encode(char* key,unsigned int k);
-void  hex_decode(string key,uint8_t* out,unsigned int k);
-
-void hexdump(void *mem, unsigned int len);
-string hexdumptostring(void *mem, unsigned int len);
-string exec(const char* cmd);
-string escape_json(const string &s);
-
-//http://bits.mdminhazulhaque.io/cpp/find-and-replace-all-occurrences-in-cpp-string.html
-void find_and_replace(string& source, string const& find, string const& replace);
-
-template<typename TimeT = chrono::milliseconds>
-struct measure
+namespace libvmtrace
 {
-	template<typename F, typename ...Args>
-	static typename TimeT::rep execution(F&& func, Args&&... args)
+namespace util
+{
+	constexpr auto HEXDUMP_COLS = 16;
+	std::string hex_encode(uint8_t* key, unsigned int k);
+	std::string hex_encode(char* key, unsigned int k);
+	void hex_decode(std::string key, uint8_t* out, unsigned int k);
+
+	void hexdump(void* mem, unsigned int len);
+	std::string hexdumptostring(void *mem, unsigned int len);
+	std::string exec(const char* cmd);
+	std::string escape_json(const std::string &s);
+
+	// http://bits.mdminhazulhaque.io/cpp/find-and-replace-all-occurrences-in-cpp-string.html
+	void find_and_replace(std::string& source, std::string const& find, std::string const& replace);
+
+	template<typename TimeT = std::chrono::milliseconds>
+	struct measure
 	{
-		auto start = chrono::steady_clock::now();
-		forward<decltype(func)>(func)(forward<Args>(args)...);
-		auto duration = chrono::duration_cast< TimeT>
-		(chrono::steady_clock::now() - start);
-		return duration.count();
-	}
-};
+		template<typename F, typename ...Args>
+		static typename TimeT::rep execution(F&& func, Args&&... args)
+		{
+			auto start = std::chrono::steady_clock::now();
+			std::forward<decltype(func)>(func)(std::forward<Args>(args)...);
+			auto duration = std::chrono::duration_cast< TimeT>
+			(std::chrono::steady_clock::now() - start);
+			return duration.count();
+		}
+	};
 
-template< typename T > string int_to_hex( T i )
-{
-  stringstream stream;
-  stream << "0x" 
-		 << setfill ('0') << setw(sizeof(T)*2) 
-		 << hex << i;
-  return stream.str();
+	template <typename T>
+	std::string int_to_hex(T i)
+	{
+		std::stringstream stream;
+		stream << "0x" 
+			<< std::setfill ('0') << std::setw(sizeof(T)*2) 
+			<< std::hex << i;
+		return stream.str();
+	}
+}
 }
 
 #endif

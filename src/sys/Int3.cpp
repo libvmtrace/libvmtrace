@@ -16,7 +16,7 @@ namespace libvmtrace
 		if(!stop_soon)
 		{
 			if(vmi_write_pa(vmi, paddr, 1, &int3opcode, &written) == VMI_FAILURE && written != 1)
-				throw runtime_error("Could not reinsert Breakpoint");
+				throw std::runtime_error("Could not reinsert Breakpoint");
 		}
 
 		Int3* int3 = (Int3*)bpd->bpm;
@@ -45,11 +45,11 @@ namespace libvmtrace
 		bpd->paddr = paddr;
 		bpd->bpm = this;
 
-		map<addr_t, uint8_t>::iterator it;
+		std::map<addr_t, uint8_t>::iterator it;
 		it = _SavedInstructions.find(paddr);
 		size_t written = 0;
 		if (vmi_write_pa (vmi, it->first, 1, &it->second, &written) == VMI_FAILURE && written != 1)
-			throw runtime_error("Could not write BP");
+			throw std::runtime_error("Could not write BP");
 
 		DecreaseCounter();
 
@@ -89,7 +89,7 @@ namespace libvmtrace
 		if(GetSystemMonitor().GetBPMType() != INTTHREE)
 		{
 			GetSystemMonitor().Stop();
-			throw runtime_error("Not match BPM type");
+			throw std::runtime_error("Not match BPM type");
 
 			return VMI_FAILURE;
 		}
@@ -120,7 +120,7 @@ namespace libvmtrace
 		}
 		else
 		{
-			throw runtime_error("System Monitor is not yet initialized");
+			throw std::runtime_error("System Monitor is not yet initialized");
 			
 			return VMI_FAILURE;
 		}
@@ -141,7 +141,7 @@ namespace libvmtrace
 		bpd->paddr = paddr;
 
 #ifdef VMTRACE_DEBUG
-		cout << "process breakpoint event @ " << hex << paddr << endl;
+		cout << "process breakpoint event @ " << hex << paddr << std::endl;
 #endif
 
 		event->interrupt_event.reinject = 0;
@@ -149,7 +149,7 @@ namespace libvmtrace
 		{
 
 #ifdef VMTRACE_DEBUG
-		cout << "\t\tsomehow the getcount == 0, reinject->1" << endl;
+		cout << "\t\tsomehow the getcount == 0, reinject->1" << std::endl;
 #endif
 
 			event->interrupt_event.reinject = 1;
@@ -159,12 +159,12 @@ namespace libvmtrace
 			bpd->beforeSingleStep = true;
 			_BPEvents.Call(paddr, bpd);
 
-			map<addr_t, uint8_t>::iterator it;
+			std::map<addr_t, uint8_t>::iterator it;
 			it = _SavedInstructions.find(paddr);
 			size_t written = 0;
 			if(vmi_write_pa (vmi, it->first, 1, &it->second, &written) == VMI_FAILURE && written != 1)
 			{
-				throw runtime_error("Could not write BP");
+				throw std::runtime_error("Could not write BP");
 			}
 			else
 			{
@@ -193,7 +193,7 @@ namespace libvmtrace
 		paddr = bpd->paddr;
 
 #ifdef VMTRACE_DEBUG
-		cout << "process single step event @ " << hex << paddr << endl;
+		std::cout << "process single step event @ " << hex << paddr << std::endl;
 #endif
 
 		vmi_pagetable_lookup(vmi, bpd->regs.cr3 , rip, &rip_pa);
@@ -211,21 +211,21 @@ namespace libvmtrace
 		{ 
 
 #ifdef VMTRACE_DEBUG
-		cout << "\t\tremove the BP" << endl;
+			std::cout << "\t\tremove the BP" << std::endl;
 #endif
 
 			// All events are deregistered at this BP now. Remove the BP
-			map<addr_t, uint8_t>::iterator it;
+			std::map<addr_t, uint8_t>::iterator it;
 			it = _SavedInstructions.find(paddr);
 			if (it == _SavedInstructions.end())
-				throw runtime_error("Could not find old instruction?");
+				throw std::runtime_error("Could not find old instruction?");
 			
 			uint8_t instr = it->second;   
 			_SavedInstructions.erase(it);
 			
 			size_t written = 0;
 			if (vmi_write_pa (vmi, paddr, 1, &instr, &written) == VMI_FAILURE && written != 1)
-				throw runtime_error("Could not write saved BP");
+				throw std::runtime_error("Could not write saved BP");
 
 			// DecreaseCounter();
 		}
@@ -234,7 +234,7 @@ namespace libvmtrace
 			size_t written = 0;
 			if (vmi_write_pa(vmi, paddr, 1, &int3opcode, &written) == VMI_FAILURE && written != 1)
 			{
-				throw runtime_error("Could not reinsert Breakpoint");
+				throw std::runtime_error("Could not reinsert Breakpoint");
 			}
 			else
 			{
@@ -250,10 +250,10 @@ namespace libvmtrace
 	{
 		vmi_instance_t vmi = GetSystemMonitor().Lock();
 
-		cerr << "Preparing to stop: handler will not re-inject BP any more" << endl;
+		std::cerr << "Preparing to stop: handler will not re-inject BP any more" << std::endl;
 		stop_soon = 1;
 		
-		cerr << "Removing BP from VM memory (without de-registering)" << endl;
+		std::cerr << "Removing BP from VM memory (without de-registering)" << std::endl;
 
 
 		for (std::map<addr_t, uint8_t>::iterator it=_SavedInstructions.begin(); 
@@ -261,13 +261,13 @@ namespace libvmtrace
 		{
 
 #ifdef VMTRACE_DEBUG
-		cout << "deinit: remove BP @ " << hex << it->first << endl;
+			std::cout << "deinit: remove BP @ " << hex << it->first << std::endl;
 #endif
 		
 			size_t written = 0;
 			if(vmi_write_pa(vmi, it->first, 1, &it->second, &written) == VMI_FAILURE && written != 1) 
 			{
-				throw runtime_error("Could not write BP");        
+				throw std::runtime_error("Could not write BP");        
 			}
 			DecreaseCounter();
 		}
@@ -275,14 +275,14 @@ namespace libvmtrace
 		{
 			int n = 0;
 			n = vmi_are_events_pending(vmi);
-			cerr << "Pending events... (" << n << ")" << endl;
+			std::cerr << "Pending events... (" << n << ")" << std::endl;
 			usleep(100000);
 			if ( n == 0 ) {
 				break;
 			}	
 		}
 
-		cout << "Counter : " << dec << GetCounter() << endl;
+		std::cout << "Counter : " << std::dec << GetCounter() << std::endl;
 
 		vmi_clear_event(vmi, &_interrupt_event, NULL);
 		vmi_clear_event(vmi, &_mem_event, NULL);
@@ -299,7 +299,7 @@ namespace libvmtrace
 		addr_t addr = ev->GetAddr();
 
 #ifdef VMTRACE_DEBUG
-		cout << "adding BP @" << hex << addr << dec << endl;
+		std::cout << "adding BP @" << hex << addr << dec << std::endl;
 #endif
 
 		_BPEvents.RegisterEvent(addr, ev);
@@ -308,15 +308,15 @@ namespace libvmtrace
 			if (vmi_read_8_pa (vmi, addr, &instr))
 			{
 				success = VMI_FAILURE;
-				throw runtime_error("Could not read instruction");
+				throw std::runtime_error("Could not read instruction");
 			}
 
-			_SavedInstructions.insert(pair<addr_t, uint8_t>(addr, instr));
+			_SavedInstructions.insert(std::pair<addr_t, uint8_t>(addr, instr));
 			size_t written = 0;
 			if (vmi_write_pa(vmi, addr, 1, &int3opcode, &written) == VMI_FAILURE && written != 1) 
 			{
 				success = VMI_FAILURE;
-				throw runtime_error("Could not write BP");
+				throw std::runtime_error("Could not write BP");
 			}
 
 			addr_t gfn = addr >> 12;
@@ -324,7 +324,7 @@ namespace libvmtrace
 			if (vmi_set_mem_event(vmi, gfn, VMI_MEMACCESS_RW, 0) == VMI_FAILURE)
 			{
 				success = VMI_FAILURE;
-				throw runtime_error("Could not change page permission");
+				throw std::runtime_error("Could not change page permission");
 			}
 
 			IncreaseCounter();
@@ -344,12 +344,12 @@ namespace libvmtrace
 		_BPEvents.DeRegisterEvent(addr, ev);
 
 #ifdef VMTRACE_DEBUG
-		cout << "removing BP @" << hex << addr << dec << endl;
+		std::cout << "removing BP @" << hex << addr << dec << std::endl;
 #endif
 
 		if (_BPEvents.GetCount(addr) == 0) 
 		{
-			map<addr_t, uint8_t>::iterator it;
+			std::map<addr_t, uint8_t>::iterator it;
 			it = _SavedInstructions.find(addr);
 			
 			if (it == _SavedInstructions.end())
@@ -363,7 +363,7 @@ namespace libvmtrace
 			if (vmi_write_pa(vmi, addr, 1, &instr, &written) == VMI_FAILURE && written != 1)
 			{
 				success = VMI_FAILURE;
-				throw runtime_error("Could not write saved BP");
+				throw std::runtime_error("Could not write saved BP");
 			}
 
 			DecreaseCounter();
@@ -379,7 +379,7 @@ namespace libvmtrace
 		addr_t addr = ev->GetAddr();
 		status_t success = VMI_SUCCESS;
 
-		map<addr_t, uint8_t>::iterator it;
+		std::map<addr_t, uint8_t>::iterator it;
 		it = _SavedInstructions.find(addr);
 
 		if (it == _SavedInstructions.end())
@@ -405,7 +405,7 @@ namespace libvmtrace
 		addr_t addr = ev->GetAddr();
 		status_t success = VMI_SUCCESS;
 
-		map<addr_t, uint8_t>::iterator it;
+		std::map<addr_t, uint8_t>::iterator it;
 		it = _SavedInstructions.find(addr);
 
 		if (it == _SavedInstructions.end())

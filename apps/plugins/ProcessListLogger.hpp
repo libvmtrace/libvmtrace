@@ -7,10 +7,10 @@
 
 namespace libvmtrace
 {
-	class ProcessListLogger : public Plugin
+	class ProcessListLogger : public util::Plugin
 	{
 		public:
-			ProcessListLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, Log& log)
+			ProcessListLogger(std::string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log)
 				: _vm_id(vm_id), _os(os), _pc(pc), _log(log), _pt(nullptr)
 			{
 				_commands.push_back("GetProcessList");
@@ -22,19 +22,19 @@ namespace libvmtrace
 				_start = false;
 			}
 
-			~ProcessListLogger() {
+			~ProcessListLogger()
+			{
 				if (_pt != nullptr)
 				{
 					delete _pt;
 					_pt = nullptr;
-				}
-				
+				}	
 			}
 
 			const std::string ExecuteCommand(const string command, 
-										const std::vector<string> params,
-										const std::string command_id,
-										const std::string vm_id);
+							const std::vector<string> params,
+							const std::string command_id,
+							const std::string vm_id);
 
 			const std::string GetName() const
 			{
@@ -62,12 +62,12 @@ namespace libvmtrace
 			std::string _vm_id;
 			OperatingSystem& _os;
 			ProcessCache& _pc;
-			Log& _log;
+			util::Log& _log;
 
 			std::vector<string> _commands;
 			std::string _log_name;
 
-			PeriodicTimer* _pt;
+			util::PeriodicTimer* _pt;
 
 			bool _start;
 	};

@@ -1,18 +1,22 @@
+
 #ifndef __KAFKALOGGER_H__
 #define __KAFKALOGGER_H__
 
 #include <string>
 #include <iostream>
-#include "util/Logging.hpp"
-#include "librdkafka/rdkafkacpp.h"
+#include <util/Logging.hpp>
+#include <librdkafka/rdkafkacpp.h>
 
-
-class KafkaLogger : public Logger
+namespace libvmtrace
 {
+namespace util
+{
+	class KafkaLogger : public Logger
+	{
 	public:
-		KafkaLogger(const string broker) : _broker(broker)
+		KafkaLogger(const std::string broker) : _broker(broker)
 		{
-			string errstr;
+			std::string errstr;
 			_conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
 			_tconf = RdKafka::Conf::create(RdKafka::Conf::CONF_TOPIC);
 			_conf->set("metadata.broker.list", _broker, errstr);
@@ -24,13 +28,16 @@ class KafkaLogger : public Logger
 		void Log(const Entry* e);
 
 	private:
-		const string _broker;
+		const std::string _broker;
 		RdKafka::Conf *_conf;
 		RdKafka::Conf *_tconf;
 		RdKafka::Producer *_producer;
 		int32_t _partition;
 
-		vector<pair<string,RdKafka::Topic*>> _topics;
-};
+		std::vector<std::pair<std::string, RdKafka::Topic*>> _topics;
+	};
+}
+}
 
 #endif
+

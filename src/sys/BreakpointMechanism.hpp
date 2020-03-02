@@ -67,7 +67,7 @@ namespace libvmtrace
 
 		bool beforeSingleStep;
 		addr_t ripAfterSingleStep;
-		string proc_name;
+		std::string proc_name;
 		int pid;
 	};
 }

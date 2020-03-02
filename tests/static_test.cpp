@@ -11,6 +11,7 @@
 
 using namespace std;
 using namespace libvmtrace;
+using namespace libvmtrace::util;
 namespace spd = spdlog;
 
 static bool interrupted = false;

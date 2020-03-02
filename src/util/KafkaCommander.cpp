@@ -1,72 +1,70 @@
-#include "util/KafkaCommander.hpp"
 
-void KafkaCommander::GetCommands()
+#include <util/KafkaCommander.hpp>
+
+namespace libvmtrace
 {
-	RdKafka::Message *message = _consumer->consume(_topic, 0, 1000);
-	switch (message->err())
+namespace util
+{
+	void KafkaCommander::GetCommands()
 	{
-		case RdKafka::ERR_NO_ERROR:
-			ParseCommand(string(static_cast<const char*>(message->payload())));
-		default:
-			break;
+		RdKafka::Message *message = _consumer->consume(_topic, 0, 1000);
+		switch (message->err())
+		{
+			case RdKafka::ERR_NO_ERROR:
+				ParseCommand(std::string(static_cast<const char*>(message->payload())));
+			default:
+				break;
+		}
 	}
-}
 
-void KafkaCommander::ParseCommand(const string command)
-{
-	Document document;
-	try
+	void KafkaCommander::ParseCommand(const std::string command)
 	{
-		document.Parse<kParseStopWhenDoneFlag>(command.c_str());
-		if(document.HasParseError())
+		rapidjson::Document document;
+		try
 		{
-			cerr << "parse error" << endl;
-			cerr << GetParseError_En(document.GetParseError()) << endl;
-			return;
-		}
-		string vm_id = document["vm_id"].GetString();
-		if(_vm_id != vm_id)
-		{
-			return;
-		}
-
-
-		//do checking
-		if(!document.HasMember("plugin") || !document.HasMember("command") || !document.HasMember("command_id") || !document.HasMember("params"))
-		{
-			cout << "json member check failed" << endl;
-			return;
-		}
-		else
-		{
-			if(!document["plugin"].IsString() || !document["command"].IsString() || !document["command_id"].IsString() || !document["params"].IsArray())
+			document.Parse<rapidjson::kParseStopWhenDoneFlag>(command.c_str());
+			if(document.HasParseError())
 			{
-				cout << "json member type check failed" << endl;
+				std::cerr << "parse error" << std::endl;
+				std::cerr << GetParseError_En(document.GetParseError()) << std::endl;
 				return;
 			}
+	
+			std::string vm_id = document["vm_id"].GetString();
+			if(_vm_id != vm_id)
+				return;
+
+			if(!document.HasMember("plugin") || !document.HasMember("command") || !document.HasMember("command_id") || !document.HasMember("params"))
+			{
+				std::cout << "json member check failed" << std::endl;
+				return;
+			}
+			else
+			{
+				if(!document["plugin"].IsString() || !document["command"].IsString() || !document["command_id"].IsString() || !document["params"].IsArray())
+				{
+					std::cout << "json member type check failed" << std::endl;
+					return;
+				}
+			}
+
+			std::string plugin = document["plugin"].GetString();
+			std::string comm = document["command"].GetString();
+			std::string command_id = document["command_id"].GetString();
+			std::vector<std::string> parameters;
+
+			rapidjson::Value& params = document["params"];
+			for (rapidjson::Value::ConstValueIterator it = params.Begin(); it != params.End(); ++it)
+				parameters.push_back(it->GetString());
+
+			std::string ret = _controller.ExecuteCommand(plugin, comm, parameters, command_id, vm_id);
+			std::cout << ret << std::endl;
 		}
-
-		string plugin = document["plugin"].GetString();
-		// cout << plugin << endl;
-		string comm = document["command"].GetString();
-		// cout << comm << endl;
-		string command_id = document["command_id"].GetString();
-		// cout << command_id << endl;
-		vector<string> parameters;
-
-		Value& params = document["params"];
-		for (Value::ConstValueIterator it = params.Begin(); it != params.End(); ++it)
+		catch(...)
 		{
-			// cout << it->GetString() << ",";
-			parameters.push_back(it->GetString());
+			std::cerr << "parse error catch" << std::endl;
 		}
-
-		string ret = _controller.ExecuteCommand(plugin, comm, parameters, command_id, vm_id);
-		// cout << endl;
-		cout << ret << endl;
-	}
-	catch(...)
-	{
-		cerr << "parse error catch" << endl;
 	}
 }
+}
+

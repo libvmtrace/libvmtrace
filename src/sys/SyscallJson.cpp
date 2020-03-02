@@ -1,9 +1,12 @@
 
 #include <sys/SyscallJson.hpp>
+#include <util/utils.hpp>
 
 namespace libvmtrace
 {
-	string SyscallJson::ExtractString(vmi_instance_t vmi, addr_t ptr) 
+	using namespace util;
+
+	std::string SyscallJson::ExtractString(vmi_instance_t vmi, addr_t ptr) 
 	{
 		access_context_t ctx;
 		char* buf = nullptr;
@@ -31,14 +34,13 @@ namespace libvmtrace
 		return !(c>=0 && c <128);
 	}
 
-	string SyscallJson::ExtractBuf(vmi_instance_t vmi, addr_t ptr, size_t size)
+	std::string SyscallJson::ExtractBuf(vmi_instance_t vmi, addr_t ptr, size_t size)
 	{
 		char* buf = nullptr;
 		access_context_t ctx;
 
 		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		// ctx.dtb &= ~0x1fff;
 		ctx.addr = ptr;
 
 		buf = new char[size];
@@ -48,34 +50,33 @@ namespace libvmtrace
 		if (vmi_read(vmi, &ctx, size, buf, &read) != VMI_SUCCESS) 
 		{
 			_pagefault = true;
-			return string("ERROR");
+			return std::string("ERROR");
 		}
 
 		if ( size == read) 
 		{
-			string str = string(buf, size);
+			std::string str = string(buf, size);
 			str.erase(remove_if(str.begin(), str.end(), invalidChar), str.end());
 
-			string ret = escape_json(str);
+			std::string ret = escape_json(str);
 			free(buf);
-			// return ret.substr(0,10);
 			return ret;
 		}
 
-		return string("ERROR");
+		return std::string("ERROR");
 	}
 
 	void SyscallJson::ToJsonOpen(vmi_instance_t vmi)
 	{
-		string path = ExtractString(vmi, SyscallBasic::GetParameter(0));
+		std::string path = ExtractString(vmi, SyscallBasic::GetParameter(0));
 
 		_writer.Key("path");
 		_writer.String(path.c_str());
 
 		reg_t flags = SyscallBasic::GetParameter(1);
 
-		//https://stackoverflow.com/questions/22008229/bitwise-or-in-linux-open-flags
-		//https://github.com/torvalds/linux/blob/master/include/uapi/asm-generic/fcntl.h
+		// https://stackoverflow.com/questions/22008229/bitwise-or-in-linux-open-flags
+		// https://github.com/torvalds/linux/blob/master/include/uapi/asm-generic/fcntl.h
 		switch (flags & 0x3) 
 		{
 			case 0:
@@ -102,15 +103,14 @@ namespace libvmtrace
 		access_context_t ctx;
 		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		// ctx.dtb &= ~0x1fff;
 
-		string path = ExtractString(vmi, SyscallBasic::GetParameter(0));
+		std::string path = ExtractString(vmi, SyscallBasic::GetParameter(0));
 		_writer.Key("path");
 		_writer.String(path.c_str());
 
 		_writer.Key("args");
 		_writer.StartArray();
-		for(int i = 0 ; i < 100 ; i++)
+		for (int i = 0 ; i < 100 ; i++)
 		{
 			addr_t tmp;
 			ctx.addr = SyscallBasic::GetParameter(1)+i*8;
@@ -118,7 +118,7 @@ namespace libvmtrace
 			if (tmp == 0)
 				break;
 
-			string tmp2 = ExtractString(vmi, tmp);
+			std::string tmp2 = ExtractString(vmi, tmp);
 			_writer.String(tmp2.c_str());
 		}
 		_writer.EndArray();
@@ -133,7 +133,7 @@ namespace libvmtrace
 			if (tmp == 0)
 				break;
 
-			string tmp2 = ExtractString(vmi, tmp);
+			std::string tmp2 = ExtractString(vmi, tmp);
 			_writer.String(tmp2.c_str());
 		}
 		_writer.EndArray();
@@ -146,12 +146,9 @@ namespace libvmtrace
 
 		struct sockaddr sa;
 		struct sockaddr_in* caster = (struct sockaddr_in*)&sa;
-		// struct sockaddr_in6* caster6 = (struct sockaddr_in6*)&sa;
-
 
 		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		// ctx.dtb &= ~0x1fff;
 		ctx.addr = sockaddr;
 
 		size_t read = 0;
@@ -168,7 +165,7 @@ namespace libvmtrace
 		} 
 		else if (sa.sa_family == AF_INET6) 
 		{
-			// TODO
+			// TODO: finish this branch.
 		}
 
 		return;
@@ -183,13 +180,12 @@ namespace libvmtrace
 
 		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		// ctx.dtb &= ~0x1fff;
 		ctx.addr = socka;
 
 		size_t read = 0;
 		vmi_read(vmi, &ctx, sizeof(struct sockaddr), &sa, &read);
 
-		//https://stackoverflow.com/questions/1276294/getting-ipv4-address-from-a-sockaddr-structure
+		// https://stackoverflow.com/questions/1276294/getting-ipv4-address-from-a-sockaddr-structure
 		if (sa.sa_family == AF_INET) 
 		{
 			struct sockaddr_in* caster = (struct sockaddr_in*)&sa;
@@ -224,7 +220,6 @@ namespace libvmtrace
 	void SyscallJson::ToJsonRead(vmi_instance_t vmi) 
 	{
 		int size =  SyscallBasic::GetRet();
-
 		size = min(size, 4096);
 
 		_writer.Key("fd");
@@ -269,7 +264,6 @@ namespace libvmtrace
 
 		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		// ctx.dtb &= ~0x1fff;
 		ctx.addr = SyscallBasic::GetParameter(1)+1*4;
 
 		vmi_read_32 (vmi, &ctx, (uint32_t*)&sockaddr);

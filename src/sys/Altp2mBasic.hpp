@@ -1,7 +1,9 @@
+
 #ifndef __LINUX_BP_ALTP2M_V_H_
 #define __LINUX_BP_ALTP2M_V_H_
 
 #include <stdint.h>
+#include <map>
 #include <sys/BreakpointMechanism.hpp>
 #include <libvmi/libvmi.h>
 #include <libvmi/slat.h>
@@ -14,7 +16,7 @@ namespace libvmtrace
 	{
 		addr_t original;
 		addr_t remapped;
-		map<addr_t, addr_t> addrs;
+		std::map<addr_t, addr_t> addrs;
 	};
 
 	class Altp2mBasic : public BreakpointMechanism
@@ -48,8 +50,8 @@ namespace libvmtrace
 
 			/* Breakpoint related */
 			EventManager<uint64_t, const BreakpointEvent*> _BPEvents;
-			map<addr_t, uint8_t> _SavedInstructions;
-			vector<remmaped_gfn> _remmaped_gfns;
+			std::map<addr_t, uint8_t> _SavedInstructions;
+			std::vector<remmaped_gfn> _remmaped_gfns;
 
 			vmi_event_t _interrupt_event;
 			vmi_event_t _mem_event;

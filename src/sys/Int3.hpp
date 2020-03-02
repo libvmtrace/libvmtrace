@@ -39,7 +39,7 @@ namespace libvmtrace
 			vmi_event_t _step_events[16];
 
 			EventManager<uint64_t, const BreakpointEvent*> _BPEvents;
-			map<addr_t, uint8_t> _SavedInstructions;
+			std::map<addr_t, uint8_t> _SavedInstructions;
 	};
 }
 

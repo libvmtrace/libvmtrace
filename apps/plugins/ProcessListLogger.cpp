@@ -1,10 +1,11 @@
 
 #include <plugins/ProcessListLogger.hpp>
 
-using namespace rapidjson;
-
 namespace libvmtrace
 {
+	using namespace rapidjson;
+	using namespace util;
+	
 	const std::string ProcessListLogger::ExecuteCommand(const std::string command, 
 					const std::vector<std::string> params,
 					const std::string command_id,

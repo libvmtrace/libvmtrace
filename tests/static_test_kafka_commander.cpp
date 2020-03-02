@@ -1,12 +1,14 @@
-#include <libvmi/libvmi.h>
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
 
-#include "Plugins.hpp"
+#include <libvmi/libvmi.h>
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
+
+#include <Plugins.hpp>
 
 #include <vector>
 
 using namespace std;
+using namespace libvmtrace::util;
 
 static bool interrupted = false;
 static void close_handler(int sig)

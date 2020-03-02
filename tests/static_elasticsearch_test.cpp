@@ -1,6 +1,8 @@
-#include "libvmtrace.hpp"
 
+#include <libvmtrace.hpp>
 #include <vector>
+
+using namespace libvmtrace::util;
 
 int main(int argc, char* argv[]) 
 {

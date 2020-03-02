@@ -5,6 +5,7 @@
 #include <plugins/Plugins.hpp>
 
 using namespace libvmtrace;
+using namespace libvmtrace::util;
 
 LinuxVM* _linux;
 SystemMonitor* _sm;

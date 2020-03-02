@@ -19,6 +19,7 @@
 using namespace std;
 using namespace spdlog;
 using namespace libvmtrace;
+using namespace libvmtrace::util;
 using namespace helpers;
 
 LinuxVM* _linux;

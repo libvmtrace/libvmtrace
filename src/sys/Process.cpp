@@ -1,10 +1,12 @@
 
 #include <sys/Process.hpp>
-
-using namespace rapidjson;
+#include <util/utils.hpp>
 
 namespace libvmtrace
 {
+	using namespace rapidjson;
+	using namespace util;
+
 	Value Process::ToJson(Document::AllocatorType& allocator) 
 	{
 		Value value;
