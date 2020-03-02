@@ -1,10 +1,12 @@
+
 #include <libvmi/libvmi.h>
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
-#include "plugins/Plugins.hpp"
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
+#include <plugins/Plugins.hpp>
 
 #include <vector>
 
+using namespace libvmtrace;
 using namespace std;
 
 static bool interrupted = false;

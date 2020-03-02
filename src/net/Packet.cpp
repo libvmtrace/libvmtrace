@@ -12,9 +12,9 @@
 // Thanks to http://seclists.org/bugtraq/1999/Mar/57
 unsigned short in_cksum(unsigned short *addr,int len)
 {
-    register int nleft = len;
-    register unsigned short *w = addr;
-    register int sum = 0;
+    int nleft = len;
+    unsigned short *w = addr;
+    int sum = 0;
     unsigned short answer = 0;
 
     while (nleft > 1)

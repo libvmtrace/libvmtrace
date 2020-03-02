@@ -1,11 +1,13 @@
+
 #include <libvmi/libvmi.h>
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
-#include "plugins/Plugins.hpp"
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
+#include <plugins/Plugins.hpp>
+
+using namespace libvmtrace;
 
 LinuxVM* _linux;
 SystemMonitor* _sm;
-
 
 static bool interrupted = false;
 static void close_handler(int sig)

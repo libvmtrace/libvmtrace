@@ -1,3 +1,4 @@
+
 #ifndef __SYSTEM_MONITOR_H
 #define __SYSTEM_MONITOR_H
 
@@ -11,128 +12,128 @@
 #include <iostream>
 #include <unistd.h>
 
-// #include "libvmtrace.hpp"
-
-using namespace std;
-
-class BreakpointMechanism;
-class RegisterMechanism;
-
-enum bpm_type_t
+namespace libvmtrace
 {
-	INTTHREE, ALTP2M, DRAKVUF, NONE
-};
+	class BreakpointMechanism;
+	class RegisterMechanism;
 
-class SystemMonitor
-{
-	public:
-		SystemMonitor(const string name, const bool event_support):
-						_name(name), _initialized(false), _event_support(event_support), _bpm(nullptr), _rm(nullptr), worker(nullptr), _profile(""), _is_locked(0) {}
+	enum bpm_type_t
+	{
+		INTTHREE, ALTP2M, DRAKVUF, NONE
+	};
 
-		~SystemMonitor();
+	class SystemMonitor
+	{
+		public:
+			SystemMonitor(const std::string name, const bool event_support) :
+				_name(name), _initialized(false), _event_support(event_support), _bpm(nullptr),
+				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0) { }
 
-		status_t Init();
-		void DeInit();
-		vmi_instance_t Lock();
-		void Unlock();
+			~SystemMonitor();
 
-		void Loop();
-		void Stop();
+			status_t Init();
+			void DeInit();
+			vmi_instance_t Lock();
+			void Unlock();
 
-		bool IsInitialized()
-		{
-			return _initialized;
-		}
+			void Loop();
+			void Stop();
 
-		bool IsEventSupported()
-		{
-			return _event_support;
-		}
-
-		const string GetName()
-		{
-			return _name;
-		}
-
-		void SetProfile(string profile)
-		{
-			_profile = profile;
-		}
-
-		void SetBPM(BreakpointMechanism* bpm, bpm_type_t type)
-		{
-			_bpm = bpm;
-			_bpm_type = type;
-		}
-
-		BreakpointMechanism* GetBPM()
-		{
-			return _bpm;
-		}
-
-		bpm_type_t GetBPMType()
-		{
-			return _bpm_type;
-		}
-
-		// drakvuf_t& GetDrakvuf()
-		// {
-		// 	return _drakvuf;
-		// }
-
-		void SetRM(RegisterMechanism* rm)
-		{
-			_rm = rm;
-		}
-
-		RegisterMechanism* GetRM()
-		{
-			return _rm;
-		}
-
-		void AddExludeAddress(addr_t address)
-		{
-			_exclude_addresses.push_back(address);
-		}
-
-		bool IsExcludeAddress(addr_t address)
-		{
-			if(_exclude_addresses.empty())
+			bool IsInitialized()
 			{
-				return false;
+				return _initialized;
 			}
 
-			if(find(_exclude_addresses.begin(), _exclude_addresses.end(), address) != _exclude_addresses.end()) 
+			bool IsEventSupported()
 			{
-				return true;
+				return _event_support;
 			}
-			else 
+
+			const std::string GetName()
 			{
-				return false;
+				return _name;
 			}
-		}
 
-	private:
-		const string _name;
-		bool _initialized;
-		bool _event_support;
-		
-		vmi_instance_t _vmi;
-		recursive_mutex _vmi_mtx;   
+			void SetProfile(std::string profile)
+			{
+				_profile = profile;
+			}
 
-		BreakpointMechanism* _bpm;
-		bpm_type_t _bpm_type;
+			void SetBPM(BreakpointMechanism* bpm, bpm_type_t type)
+			{
+				_bpm = bpm;
+				_bpm_type = type;
+			}
 
-		RegisterMechanism* _rm;
+			BreakpointMechanism* GetBPM()
+			{
+				return _bpm;
+			}
 
-		vector<addr_t> _exclude_addresses;
+			bpm_type_t GetBPMType()
+			{
+				return _bpm_type;
+			}
 
-		thread* worker;
+			// drakvuf_t& GetDrakvuf()
+			// {
+			// 	return _drakvuf;
+			// }
 
-		string _profile;
+			void SetRM(RegisterMechanism* rm)
+			{
+				_rm = rm;
+			}
 
-	protected:
-		int _is_locked;
-};
+			RegisterMechanism* GetRM()
+			{
+				return _rm;
+			}
+
+			void AddExludeAddress(addr_t address)
+			{
+				_exclude_addresses.push_back(address);
+			}
+
+			bool IsExcludeAddress(addr_t address)
+			{
+				if(_exclude_addresses.empty())
+				{
+					return false;
+				}
+
+				if(find(_exclude_addresses.begin(), _exclude_addresses.end(), address) != _exclude_addresses.end()) 
+				{
+					return true;
+				}
+				else 
+				{
+					return false;
+				}
+			}
+
+		private:
+			const std::string _name;
+			bool _initialized;
+			bool _event_support;
+			
+			vmi_instance_t _vmi;
+			std::recursive_mutex _vmi_mtx;   
+
+			BreakpointMechanism* _bpm;
+			bpm_type_t _bpm_type;
+
+			RegisterMechanism* _rm;
+
+			std::vector<addr_t> _exclude_addresses;
+
+			std::thread* worker;
+			std::string _profile;
+
+		protected:
+			int _is_locked;
+	};
+}
+
 #endif
-// vim: tabstop=4 shiftwidth=4 expandtab
+

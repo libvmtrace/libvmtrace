@@ -1,5 +1,6 @@
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
+
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
 
 #include <iostream>
 #include <vector>
@@ -25,6 +26,8 @@
 // #include <sqlite3.h>
 
 using namespace std;
+using namespace libvmtrace;
+using namespace helpers;
 using namespace spdlog;
 
 LinuxVM* _linux;

@@ -1,21 +1,28 @@
+
 #include <sys/OperatingSystem.hpp>
 
-string OperatingSystem::GetProcessesListJson(vector<Process> processes)
+using namespace rapidjson;
+
+namespace libvmtrace
 {
-	Document document;
-	document.SetObject();
-	Document::AllocatorType& allocator = document.GetAllocator();
-	Value array(kArrayType);
-
-	for(vector<Process>::iterator it = processes.begin() ; it != processes.end(); ++it)
+	std::string OperatingSystem::GetProcessesListJson(std::vector<Process> processes)
 	{
-		array.PushBack((*it).ToJson(allocator), allocator);
+		Document document;
+		document.SetObject();
+		Document::AllocatorType& allocator = document.GetAllocator();
+		Value array(kArrayType);
+
+		for(vector<Process>::iterator it = processes.begin() ; it != processes.end(); ++it)
+		{
+			array.PushBack((*it).ToJson(allocator), allocator);
+		}
+
+		document.AddMember("processes", array, allocator);
+		StringBuffer s;
+		Writer<StringBuffer> writer(s);
+		document.Accept(writer);
+
+		return s.GetString();
 	}
-
-	document.AddMember("processes", array, allocator);
-	StringBuffer s;
-	Writer<StringBuffer> writer(s);
-	document.Accept(writer);
-
-	return s.GetString();
 }
+
