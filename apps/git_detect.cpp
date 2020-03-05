@@ -1,5 +1,6 @@
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
+
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
 
 #include <iostream>
 #include <vector>
@@ -12,19 +13,21 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/async.h"
-#include "spdlog/sinks/basic_file_sink.h"
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
-#include "rapidjson/document.h"
-#include "rapidjson/istreamwrapper.h"
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
 
-#include "ssh_helper/SSHHelper.hpp"
-
-// #include <sqlite3.h>
+#include <ssh_helper/SSHHelper.hpp>
 
 using namespace std;
+using namespace rapidjson;
+using namespace libvmtrace;
+using namespace libvmtrace::util;
+using namespace helpers;
 using namespace spdlog;
 
 LinuxVM* _linux;

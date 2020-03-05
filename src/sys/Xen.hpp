@@ -11,11 +11,11 @@ extern "C"
 	#include <xenctrl.h>
 }
 
-using namespace std;
-
-//https://github.com/xen-project/xen/blob/16bbf8e7b39b50457bb2f6547f166bd54d50e4cd/tools/libxc/include/xenctrl.h
-class Xen
+namespace libvmtrace
 {
+	// https://github.com/xen-project/xen/blob/16bbf8e7b39b50457bb2f6547f166bd54d50e4cd/tools/libxc/include/xenctrl.h
+	class Xen
+	{
 	public:
 		Xen(uint64_t vmid);
 		~Xen();
@@ -33,6 +33,8 @@ class Xen
 		uint64_t _vmid;
 		uint64_t _max_mem;
 		xc_interface* _xci;
-};
+	};
+}
 
 #endif
+

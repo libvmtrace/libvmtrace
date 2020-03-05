@@ -1,74 +1,79 @@
+
 #ifndef __PROCESS_LIST_LOGGER_
 #define __PROCESS_LIST_LOGGER_
 
 #include <libvmi/libvmi.h>
-#include "libvmtrace.hpp"
+#include <libvmtrace.hpp>
 
-using namespace std;
-
-class ProcessListLogger : public Plugin
+namespace libvmtrace
 {
-	public:
-		ProcessListLogger(string vm_id, OperatingSystem& os, ProcessCache& pc, Log& log) : _vm_id(vm_id), _os(os), _pc(pc), _log(log), _pt(nullptr)
-		{
-			_commands.push_back("GetProcessList");
-			_commands.push_back("EnablePeriodic <time(s)>");
-			_commands.push_back("DisablePeriodic");
-
-			_log_name = "processes_list_"+vm_id;
-
-			_start = false;
-		}
-		~ProcessListLogger() {
-			if (_pt != nullptr)
+	class ProcessListLogger : public util::Plugin
+	{
+		public:
+			ProcessListLogger(std::string vm_id, OperatingSystem& os, ProcessCache& pc, util::Log& log)
+				: _vm_id(vm_id), _os(os), _pc(pc), _log(log), _pt(nullptr)
 			{
-				delete _pt;
-				_pt = nullptr;
+				_commands.push_back("GetProcessList");
+				_commands.push_back("EnablePeriodic <time(s)>");
+				_commands.push_back("DisablePeriodic");
+
+				_log_name = "processes_list_"+vm_id;
+
+				_start = false;
 			}
-			
-		}
 
-		const string ExecuteCommand(const string command, 
-									const vector<string> params,
-									const string command_id,
-									const string vm_id);
+			~ProcessListLogger()
+			{
+				if (_pt != nullptr)
+				{
+					delete _pt;
+					_pt = nullptr;
+				}	
+			}
 
-		const string GetName() const
-		{
-			return "ProcessListLogger";
-		}
+			const std::string ExecuteCommand(const std::string command, 
+							const std::vector<std::string> params,
+							const std::string command_id,
+							const std::string vm_id);
 
-		const vector<string> GetListCommands() const
-		{
-			return _commands;
-		}
+			const std::string GetName() const
+			{
+				return "ProcessListLogger";
+			}
 
-		const void Stop()
-		{
-			cout << "STOP" << endl;
-		}
+			const std::vector<std::string> GetListCommands() const
+			{
+				return _commands;
+			}
 
-		string GetVmId()
-		{
-			return _vm_id;
-		}
+			const void Stop()
+			{
+				std::cout << "STOP" << std::endl;
+			}
 
-		bool callback(const Event* ev, void* data);
+			std::string GetVmId()
+			{
+				return _vm_id;
+			}
 
-	private:
-		string _vm_id;
-		OperatingSystem& _os;
-		ProcessCache& _pc;
-		Log& _log;
+			bool callback(const Event* ev, void* data);
 
-		vector<string> _commands;
-		string _log_name;
+		private:
+			std::string _vm_id;
+			OperatingSystem& _os;
+			ProcessCache& _pc;
+			util::Log& _log;
 
-		PeriodicTimer* _pt;
+			std::vector<std::string> _commands;
+			std::string _log_name;
 
-		bool _start;
-};
+			util::PeriodicTimer* _pt;
 
-void LogProcessList(void *data);
+			bool _start;
+	};
+
+	void LogProcessList(void *data);
+}
 
 #endif
+

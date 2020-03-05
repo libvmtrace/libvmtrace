@@ -1,14 +1,17 @@
-#include <libvmi/libvmi.h>
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/async.h"
+#include <libvmi/libvmi.h>
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/async.h>
 
 #include <vector>
 
 using namespace std;
+using namespace libvmtrace;
+using namespace libvmtrace::util;
 namespace spd = spdlog;
 
 static bool interrupted = false;

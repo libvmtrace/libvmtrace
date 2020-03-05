@@ -1,6 +1,8 @@
-#include "libvmtrace.hpp"
 
+#include <libvmtrace.hpp>
 #include <vector>
+
+using namespace libvmtrace::util;
 
 int main(int argc, char* argv[]) 
 {
@@ -8,7 +10,7 @@ int main(int argc, char* argv[])
 	el->CheckIndex("git-monitoring");
 	el->CheckIndex("git-monitoring2");
 	el->CreateIndex("testing","");
-	vector<string> test;
+	std::vector<std::string> test;
 
 	test.push_back("{ \"testing\" : \"asd1\" }");
 	test.push_back("{ \"testing\" : \"asd2\" }");

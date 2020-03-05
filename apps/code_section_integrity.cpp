@@ -1,9 +1,13 @@
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
+
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
 #include <openssl/sha.h>
 #include <chrono>
 
 using namespace std;
+using namespace rapidjson;
+using namespace libvmtrace;
+using namespace libvmtrace::util;
 
 LinuxVM* _linux;
 SystemMonitor* _sm;

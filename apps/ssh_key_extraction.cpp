@@ -1,5 +1,6 @@
-#include "libvmtrace.hpp"
-#include "sys/LinuxVM.hpp"
+
+#include <libvmtrace.hpp>
+#include <sys/LinuxVM.hpp>
 
 #include <iostream>
 #include <vector>
@@ -8,15 +9,18 @@
 #include <chrono>
 #include <fstream>
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/async.h"
-#include "spdlog/sinks/basic_file_sink.h"
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
-#include "ssh_helper/SSHHelper.hpp"
+#include <ssh_helper/SSHHelper.hpp>
 
 using namespace std;
 using namespace spdlog;
+using namespace libvmtrace;
+using namespace libvmtrace::util;
+using namespace helpers;
 
 LinuxVM* _linux;
 SystemMonitor* _sm;

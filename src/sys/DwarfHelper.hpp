@@ -1,21 +1,24 @@
+
 #ifndef __DWARFHELPER_H__
 #define __DWARFHELPER_H__
 
 #include <libdwarfparser/libdwarfparser.h>
 #include <libvmi/libvmi.h>
 
-using namespace std;
-
-class DwarfHelper 
+namespace libvmtrace
 {
-	public:
-		DwarfHelper(string binaryPath);
-		addr_t getVariableOffset(string structName, string variableName);
-	private:
-		SymbolManager _mgr;
-		BaseType *_bt;
-		Struct *_structPtr;
-		string _structNameTemp;
-};
+	class DwarfHelper 
+	{
+		public:
+			DwarfHelper(std::string binaryPath);
+			addr_t getVariableOffset(std::string structName, std::string variableName);
+		
+		private:
+			SymbolManager _mgr;
+			BaseType *_bt;
+			Struct *_structPtr;
+			std::string _structNameTemp;
+	};
+}
 
 #endif

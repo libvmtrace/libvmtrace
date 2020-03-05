@@ -1,3 +1,4 @@
+
 #ifndef __PERIODIC_TIMER_H__
 #define __PERIODIC_TIMER_H__
 
@@ -7,25 +8,24 @@
 #include <unistd.h>
 #include <chrono>
 
-
-using namespace std;
-
-class PeriodicTimer;
-
-static void PThelper(PeriodicTimer* p);
-
-class PeriodicTimer
+namespace libvmtrace
 {
+namespace util
+{
+	static void PThelper(class PeriodicTimer* p);
+
+	class PeriodicTimer
+	{
 	public:
-		PeriodicTimer(function<void(void*)> f, void* data, int time_ms) : _stop(false), _func(f), _data(data), _time_ms(time_ms)
+		PeriodicTimer(std::function<void(void*)> f, void* data, int time_ms) : _stop(false), _func(f), _data(data), _time_ms(time_ms)
 		{
 			try
 			{
-				_worker = thread(PThelper, this);
+				_worker = std::thread(PThelper, this);
 			}
 			catch(...)
 			{
-				cerr << "Could not start PeriodicTimer Worker " << endl;
+				std::cerr << "Could not start PeriodicTimer Worker " << std::endl;
 			}
 		}
 
@@ -37,41 +37,44 @@ class PeriodicTimer
 
 		void loop()
 		{
-			while(!_stop)
+			while (!_stop)
 			{
 				auto start = std::chrono::high_resolution_clock::now();
+				
 				try
 				{
 					_func(_data);
 				}
 				catch(...)
 				{
-					cerr << "Could not call PeriodicTimer Callback" << endl;
+					std::cerr << "Could not call PeriodicTimer Callback" << std::endl;
 				}
+
 				auto end = std::chrono::high_resolution_clock::now();
 				auto dur = end - start;
 	                        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
 
-				if (_time_ms - ms > 0) {
-					this_thread::sleep_for(chrono::milliseconds(_time_ms-ms));
-				} else	{
-					cerr << "periodic timer: time too low " << ms << " < " << _time_ms << endl;
-					this_thread::sleep_for(chrono::milliseconds(_time_ms));
+				if (_time_ms - ms > 0)
+					std::this_thread::sleep_for(std::chrono::milliseconds(_time_ms - ms));
+				else
+				{
+					std::cerr << "periodic timer: time too low " << ms << " < " << _time_ms << std::endl;
+					std::this_thread::sleep_for(std::chrono::milliseconds(_time_ms));
 				}
 			}
 		}
 
 	private:
 		bool _stop;
-		function<void(void*)> _func;
+		std::function<void(void*)> _func;
 		void* _data;
 		int _time_ms;
-		thread _worker;
-};
+		std::thread _worker;
+	};
 
-static void PThelper(PeriodicTimer* p) 
-{ 
-	p->loop();
+	static void PThelper(class PeriodicTimer* p) { p->loop(); }
+}
 }
 
 #endif
+

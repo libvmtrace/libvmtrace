@@ -1,38 +1,43 @@
+
 #ifndef __REGISTER_MECHANISM_H_
 #define __REGISTER_MECHANISM_H_
 
-#include "sys/Event.hpp"
-#include "sys/SystemMonitor.hpp"
+#include <sys/Event.hpp>
+#include <sys/SystemMonitor.hpp>
 
-class RegisterMechanism
+namespace libvmtrace
 {
-	public:
-		RegisterMechanism(SystemMonitor& sm):_sm(sm), _initialized(false)
-		{
-			if(!sm.IsEventSupported())
+	class RegisterMechanism
+	{
+		public:
+			RegisterMechanism(SystemMonitor& sm):_sm(sm), _initialized(false)
 			{
-				throw std::runtime_error("Event not supported");
+				if(!sm.IsEventSupported())
+				{
+					throw std::runtime_error("Event not supported");
+				}
 			}
-		}
-		status_t Init();
-		void DeInit();
-		status_t InsertRegisterEvent(const ProcessChangeEvent* ev);
-		status_t RemoveRegisterEvent(const ProcessChangeEvent* ev);
+			status_t Init();
+			void DeInit();
+			status_t InsertRegisterEvent(const ProcessChangeEvent* ev);
+			status_t RemoveRegisterEvent(const ProcessChangeEvent* ev);
 
-		void ProcessRegisterEvent(vmi_event_t* ev);
-		
-		SystemMonitor& GetSystemMonitor()
-		{
-			return _sm;
-		}
-	private:
-		SystemMonitor& _sm;
+			void ProcessRegisterEvent(vmi_event_t* ev);
+			
+			SystemMonitor& GetSystemMonitor()
+			{
+				return _sm;
+			}
+		private:
+			SystemMonitor& _sm;
 
-		vmi_event_t _register_event;
+			vmi_event_t _register_event;
 
-		EventManager<uint64_t, const RegEvent*> _RegEvents;
+			EventManager<uint64_t, const RegEvent*> _RegEvents;
 
-		bool _initialized;
-};
+			bool _initialized;
+	};
+}
 
 #endif
+

@@ -1,143 +1,114 @@
+
 #ifndef __SETTINGS_H__
 #define __SETTINGS_H__
 
 #include <string>
-#include "rapidjson/document.h"
-#include "rapidjson/istreamwrapper.h"
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
 
-using namespace std;
-using namespace rapidjson;
-
-class Setting
+namespace libvmtrace
 {
+namespace util
+{
+	class Setting
+	{
 	public:
-		Setting(string path) : _path(path)
+		Setting(std::string path) : _path(path)
 		{
-			ifstream ifs(path);
-			if(ifs.fail())
-			{
-				throw runtime_error("Setting file does not exist");
-			}
+			std::ifstream ifs(path);
+			if (ifs.fail())
+				throw std::runtime_error("Setting file does not exist");
 
-			IStreamWrapper isw(ifs);
+			rapidjson::IStreamWrapper isw(ifs);
 			_document.ParseStream(isw);
-			if(_document.HasParseError())
-			{
-				throw runtime_error("Error parse setting file");
-			}
+			if (_document.HasParseError())
+				throw std::runtime_error("Error parse setting file");
 		}
 
-		string GetStringValue(string key)
+		std::string GetStringValue(std::string key)
 		{
-			if(!_document.HasMember(key.c_str()))
-			{
-				throw runtime_error("Key : "+key+" not found");
-			}
+			if (!_document.HasMember(key.c_str()))
+				throw std::runtime_error("Key : " + key + " not found");
 
-			if(!_document[key.c_str()].IsString())
-			{
-				throw runtime_error("Key : "+key+" not a string");
-			}
+			if (!_document[key.c_str()].IsString())
+				throw std::runtime_error("Key : " + key + " not a string");
 			
 			return _document[key.c_str()].GetString();
 		}
 
-		int GetIntValue(string key)
+		int GetIntValue(std::string key)
 		{
-			if(!_document.HasMember(key.c_str()))
-			{
-				throw runtime_error("Key : "+key+" not found");
-			}
+			if (!_document.HasMember(key.c_str()))
+				throw std::runtime_error("Key : " + key + " not found");
 
-			if(!_document[key.c_str()].IsInt())
-			{
-				throw runtime_error("Key : "+key+" not an int");
-			}
+			if (!_document[key.c_str()].IsInt())
+				throw std::runtime_error("Key : " + key + " not an int");
 			
 			return _document[key.c_str()].GetInt();
 		}
 
-		double GetDoubleValue(string key)
+		double GetDoubleValue(std::string key)
 		{
-			if(!_document.HasMember(key.c_str()))
-			{
-				throw runtime_error("Key : "+key+" not found");
-			}
+			if (!_document.HasMember(key.c_str()))
+				throw std::runtime_error("Key : " + key + " not found");
 
-			if(!_document[key.c_str()].IsInt())
-			{
-				throw runtime_error("Key : "+key+" not a double");
-			}
+			if (!_document[key.c_str()].IsInt())
+				throw std::runtime_error("Key : " + key + " not a double");
 			
 			return _document[key.c_str()].GetDouble();
 		}
 
-		vector<string> GetArrayString(string key)
+		std::vector<std::string> GetArrayString(std::string key)
 		{
-			if(!_document.HasMember(key.c_str()))
-			{
-				throw runtime_error("Key : "+key+" not found");
-			}
+			if (!_document.HasMember(key.c_str()))
+				throw std::runtime_error("Key : " + key + " not found");
 
-			vector<string> ret;
+			std::vector<std::string> ret;
 
-			for(SizeType i = 0 ; i < _document[key.c_str()].Size() ; i++)
-			{
-				if(_document[key.c_str()][i].IsString())
-				{
+			for (rapidjson::SizeType i = 0; i < _document[key.c_str()].Size(); i++)
+				if (_document[key.c_str()][i].IsString())
 					ret.push_back(_document[key.c_str()][i].GetString());
-				}
-			}
-
+	
 			return ret;
 		}
 
-		vector<int> GetArrayInteger(string key)
+		std::vector<int> GetArrayInteger(std::string key)
 		{
-			if(!_document.HasMember(key.c_str()))
-			{
-				throw runtime_error("Key : "+key+" not found");
-			}
+			if (!_document.HasMember(key.c_str()))
+				throw std::runtime_error("Key : " + key + " not found");
 
-			vector<int> ret;
+			std::vector<int> ret;
 
-			for(SizeType i = 0 ; i < _document[key.c_str()].Size() ; i++)
-			{
-				if(_document[key.c_str()][i].IsInt())
-				{
+			for (rapidjson::SizeType i = 0; i < _document[key.c_str()].Size(); i++)
+				if (_document[key.c_str()][i].IsInt())
 					ret.push_back(_document[key.c_str()][i].GetInt());
-				}
-			}
 
 			return ret;
 		}
 
-		vector<double> GetArrayDouble(string key)
+		std::vector<double> GetArrayDouble(std::string key)
 		{
-			if(!_document.HasMember(key.c_str()))
-			{
-				throw runtime_error("Key : "+key+" not found");
-			}
+			if (!_document.HasMember(key.c_str()))
+				throw std::runtime_error("Key : " + key + " not found");
 
-			vector<double> ret;
+			std::vector<double> ret;
 
-			for(SizeType i = 0 ; i < _document[key.c_str()].Size() ; i++)
-			{
-				if(_document[key.c_str()][i].IsDouble())
-				{
+			for (rapidjson::SizeType i = 0; i < _document[key.c_str()].Size(); i++)
+				if (_document[key.c_str()][i].IsDouble())
 					ret.push_back(_document[key.c_str()][i].GetDouble());
-				}
-			}
 
 			return ret;
 		}
 
 	private:
-		string _path;
-		Document _document;
-};
+		std::string _path;
+		rapidjson::Document _document;
+	};
+}
+}
 
 #endif
+
