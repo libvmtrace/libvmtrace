@@ -156,8 +156,8 @@ namespace libvmtrace
 
 			void Stop();
 
-			addr_t GetSymbolAddrVa(const std::string binaryPath, const Process& p, const std::string symbolName);
-			addr_t GetSymbolAddrPa(const std::string binaryPath, const Process& p, const std::string symbolName);
+			addr_t GetSymbolAddrVa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
+			addr_t GetSymbolAddrPa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
 			
 			void PopulatePageFaultAdress(const vmi_pid_t pid, const addr_t target, EventListener* evl);
 			status_t InvokePageFault(uint64_t total_address_per_inst);

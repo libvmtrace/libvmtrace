@@ -13,7 +13,7 @@ namespace libvmtrace
 	public:
 		ElfHelper() = default;
 		int elf_check_file(Elf64_Ehdr* hdr);
-		addr_t elf_get_symbol_addr(void* memory, const char* section,const char* symbol);
+		addr_t elf_get_symbol_addr(void* memory, const char* section, const char* symbol, const bool only_functions = true);
 		size_t get_section_offset(void* memory, const char* section);
 		char* map_file(const char* file_name, off_t offset, int*);
 	};
