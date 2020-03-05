@@ -60,7 +60,7 @@ namespace libvmtrace
 		return 0;
 	}
 
-	addr_t ElfHelper::elf_get_symbol_addr(void* memory, const char* section,const char* symbol) 
+	addr_t ElfHelper::elf_get_symbol_addr(void* memory, const char* section, const char* symbol, const bool only_functions) 
 	{
 		unsigned int i=0;
 		Elf64_Ehdr* ehdr = (Elf64_Ehdr*)memory;
@@ -84,7 +84,7 @@ namespace libvmtrace
 				Elf64_Sym* s = (Elf64_Sym*) ((char*)memory + sect[i].sh_offset);
 				for(symit=0; symit<count; symit++)
 				{
-					if (!((ELF32_ST_BIND(STB_GLOBAL) | ELF64_ST_TYPE(STT_FUNC)) & s[symit].st_info))
+					if (only_functions && !((ELF32_ST_BIND(STB_GLOBAL) | ELF64_ST_TYPE(STT_FUNC)) & s[symit].st_info))
 						continue;
 					if (s[symit].st_value == 0)
 						continue;

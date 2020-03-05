@@ -885,39 +885,38 @@ namespace libvmtrace
 		return func;
 	}
 
-	addr_t LinuxVM::GetSymbolAddrVa(const string binaryPath, const Process& p, const string symbolName)
+	addr_t LinuxVM::GetSymbolAddrVa(const string binaryPath, const Process& p, const string symbolName, const bool onlyFunctions)
 	{
 		addr_t va = 0;
 		int len = 0;
 
 		if(binaryPath.compare(_binaryPathTemp) != 0)
 		{
-			_binaryMap = _eh->map_file(binaryPath.c_str(),0,&len);
+			_binaryMap = _eh->map_file(binaryPath.c_str(), 0, &len);
 			_binaryPathTemp = binaryPath;
 		}
 
-		addr_t offset = (_eh->elf_get_symbol_addr(_binaryMap, ".symtab",symbolName.c_str()));
+		const auto offset = _eh->elf_get_symbol_addr(_binaryMap, ".symtab", symbolName.c_str(), onlyFunctions);
+		const auto maps = GetMMaps(p);
 
-		vector<vm_area> maps = GetMMaps(p);
-		for(vector<vm_area>::iterator it = maps.begin() ; it != maps.end(); ++it)
+		for (const auto& entry : maps)
 		{
-			if((*it).path.find(p.GetName()) != string::npos)
+			if (onlyFunctions && !(entry.flags & 0x4))
+				continue;
+
+			if (entry.path.find(p.GetName()) != string::npos)
 			{
-				//find executable region
-				if((*it).flags & 0x4)
-				{
-					va = (*it).start + offset;
-					break;
-				}
+				va = entry.start + offset;
+				break;
 			}
 		}
-
+		
 		return va;
 	}
 
-	addr_t LinuxVM::GetSymbolAddrPa(const string binaryPath, const Process& p, const string symbolName)
+	addr_t LinuxVM::GetSymbolAddrPa(const string binaryPath, const Process& p, const string symbolName, const bool onlyFunctions)
 	{
-		addr_t va = GetSymbolAddrVa(binaryPath, p, symbolName);
+		addr_t va = GetSymbolAddrVa(binaryPath, p, symbolName, onlyFunctions);
 		
 		if(va == 0)
 		{
