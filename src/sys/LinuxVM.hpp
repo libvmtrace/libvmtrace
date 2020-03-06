@@ -25,6 +25,7 @@ namespace libvmtrace
 		CodeInjectionType type;
 
 		vmi_pid_t target_pid;
+		vmi_pid_t child_pid;
 		addr_t target_dtb;
 		addr_t task_struct;
 

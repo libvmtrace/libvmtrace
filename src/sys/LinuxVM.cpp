@@ -29,15 +29,14 @@ namespace libvmtrace
 	push rax
 	mov rax, 0x3A // vfork
 	syscall
-	pop rax // restore rax
+        xchg rax, [rsp] // restore rax
 	int 3 // breakpoint
 	mov rax, 0x3B // exec
 	syscall
 	mov rax, 0x3C // exit
 	syscall
 	*/
-	static char code_syscall_vfork_exec[] = "\x50\x48\xC7\xC0\x3A\x00\x00\x00\x0F\x05\x58\xCC\x48\xC7\xC0\x3B\x00\x00\x00\x0F\x05\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05";
-
+       static char code_syscall_vfork_exec[] = "\x50\x48\xC7\xC0\x3A\x00\x00\x00\x0F\x05\x48\x87\x04\x24\xCC\x48\xC7\xC0\x3B\x00\x00\x00\x0F\x05\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05";
 	static char bin[] = "/bin/bash";
 	static char param1[] = "-c";
 
@@ -1165,11 +1164,14 @@ namespace libvmtrace
 			cout << "bp 3 hit fork exec" << endl;
 #endif
 
+			CodeInjection ci = *it2;
+			vmi_read_64_va(vmi, a->regs.rsp, it2->target_pid, (uint64_t*) &ci.child_pid);
+		
+			vmi_set_vcpureg(vmi, a->regs.rsp + 8, RSP, a->vcpu);
 			vmi_set_vcpureg(vmi, (*it2).breakpoint1, RIP, a->vcpu);
 
 			vmi_write_va(vmi, (*it2).breakpoint1, (*it2).target_pid, (*it2).instr_size, (*it2).saved_code, NULL);
-
-			CodeInjection ci = *it2;
+			
 			(*it2).evl->callback(ev, &ci);
 
 			delete (*it2).bp1;
@@ -1296,7 +1298,7 @@ namespace libvmtrace
 				vmi_translate_uv2p(vmi, (*it3).breakpoint1, pid, &breakpoint_pa);
 				(*it3).breakpoint_pa1 = breakpoint_pa;
 
-				(*it3).breakpoint2 = (*it3).breakpoint1 + 11;
+                               (*it3).breakpoint2 = (*it3).breakpoint1 + 14;
 				vmi_translate_uv2p(vmi, (*it3).breakpoint2, pid, &breakpoint_pa);
 				(*it3).breakpoint_pa2 = breakpoint_pa;
 
@@ -1608,9 +1610,7 @@ namespace libvmtrace
 		_code_injections.push_back(ci);
 
 		if(_process_change == nullptr)
-		{
 			_process_change = new ProcessChangeEvent(_code_injection_proc_cr3);
-		}
 
 		_sm->GetRM()->InsertRegisterEvent(_process_change);
 
