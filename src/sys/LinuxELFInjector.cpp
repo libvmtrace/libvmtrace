@@ -36,12 +36,6 @@ namespace libvmtrace
 		// store pointer to executable so the event callbacks can access them later.
 		this->executable = executable;
 
-		// store off all childs of this process so that we can identify the fork later on.
-		const auto plist = vm->GetProcessList();
-		for (const auto& p : plist)
-			if (p.GetParentPid() == parent.GetPid())
-				initial_childs.emplace_back(p.GetPid());
-
 		// invoke process fork.
 		vm->InvokeCommand(parent.GetPid(), "while true; do sleep 5; done", inject_listener.get());
 		
@@ -54,16 +48,9 @@ namespace libvmtrace
 
 	bool LinuxELFInjector::on_injection(const Event* event, void* data)
 	{	
-		// find our forked, looping process by comparing to the 'starting' case.
-		// TODO: somehow retrieve the pid from the return value of the injected code,
-		// and remove all of this. for now, this isn't possible, because the RAX register
-		// is restored before the interrupt is triggered.
 		const auto plist = vm->GetProcessList();
 		const auto result = std::find_if(plist.begin(), plist.end(),
-			[&](const auto& p) -> bool { return p.GetParentPid() == parent.GetPid()
-				&& std::find_if(initial_childs.begin(), initial_childs.end(),
-						[&] (const auto& t) -> bool { return t == p.GetPid(); }
-						) == initial_childs.end(); });
+			[&](const auto& p) -> bool { return p.GetPid() == ((CodeInjection*) data)->child_pid; });
 		if (result == plist.end())
 		{
 			throw std::runtime_error("Failed to find forked process.");
@@ -72,7 +59,6 @@ namespace libvmtrace
 
 		// store off child process.
 		child = std::make_unique<Process>(*result);
-		assert(child->GetPid() != parent.GetPid());
 		forked = true;
 
 		// set a callback for the context switch back to the usermode process.

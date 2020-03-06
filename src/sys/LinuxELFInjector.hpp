@@ -126,7 +126,6 @@ namespace libvmtrace
 		addr_t start, mmap, last_chance;
 		uint32_t page_loop{};
 		std::vector<uint8_t> stored_bytes{};
-		std::vector<vmi_pid_t> initial_childs{};
 		std::unique_ptr<ProcessChangeEvent> cr3_change;
 		std::unique_ptr<ProcessBreakpointEvent> mmap_break, last_chance_break;
 		std::unique_ptr<SyscallEvent> execveat_call;
