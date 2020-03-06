@@ -29,14 +29,14 @@ namespace libvmtrace
 	push rax
 	mov rax, 0x3A // vfork
 	syscall
-        xchg rax, [rsp] // restore rax
+	xchg rax, [rsp] // restore rax
 	int 3 // breakpoint
 	mov rax, 0x3B // exec
 	syscall
 	mov rax, 0x3C // exit
 	syscall
 	*/
-       static char code_syscall_vfork_exec[] = "\x50\x48\xC7\xC0\x3A\x00\x00\x00\x0F\x05\x48\x87\x04\x24\xCC\x48\xC7\xC0\x3B\x00\x00\x00\x0F\x05\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05";
+	static char code_syscall_vfork_exec[] = "\x50\x48\xC7\xC0\x3A\x00\x00\x00\x0F\x05\x48\x87\x04\x24\xCC\x48\xC7\xC0\x3B\x00\x00\x00\x0F\x05\x48\xC7\xC0\x3C\x00\x00\x00\x0F\x05";
 	static char bin[] = "/bin/bash";
 	static char param1[] = "-c";
 
@@ -1297,8 +1297,8 @@ namespace libvmtrace
 				addr_t breakpoint_pa = 0;
 				vmi_translate_uv2p(vmi, (*it3).breakpoint1, pid, &breakpoint_pa);
 				(*it3).breakpoint_pa1 = breakpoint_pa;
-
-                               (*it3).breakpoint2 = (*it3).breakpoint1 + 14;
+				
+				(*it3).breakpoint2 = (*it3).breakpoint1 + 14;
 				vmi_translate_uv2p(vmi, (*it3).breakpoint2, pid, &breakpoint_pa);
 				(*it3).breakpoint_pa2 = breakpoint_pa;
 
