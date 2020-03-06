@@ -60,7 +60,7 @@ class TestListener1 : public EventListener
 
 int main(int argc, char* argv[]) 
 {
-       if (argc != 3)
+	if (argc != 3)
 	{
 		std::cout << argv[0] << " <vmname>  <pid>" << endl;
 		return -1;
