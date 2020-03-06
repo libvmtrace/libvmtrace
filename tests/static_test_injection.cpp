@@ -34,13 +34,13 @@ class TestListener : public EventListener
 	public:
 		bool callback(const Event* ev, void* data)
 		{
-			// CodeInjection* s = (CodeInjection*)data;
+			CodeInjection* s = (CodeInjection*)data;
 
 			// cout << hex << s->result_addr << endl;
 
 			// interrupted = 1;
 
-			cout << "done" << endl;
+			cout << "child pid: " << s->child_pid << endl;
 
 			interrupted = 1;
 
@@ -60,7 +60,7 @@ class TestListener1 : public EventListener
 
 int main(int argc, char* argv[]) 
 {
-	if (argc != 4)
+       if (argc != 3)
 	{
 		std::cout << argv[0] << " <vmname>  <pid>" << endl;
 		return -1;
