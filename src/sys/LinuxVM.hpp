@@ -135,75 +135,78 @@ namespace libvmtrace
 
 	class LinuxVM : public OperatingSystem 
 	{
-		public:
-			LinuxVM(SystemMonitor* sm);
+	public:
+		LinuxVM(SystemMonitor* sm);
 
-			std::vector<Process> GetProcessList();
-			std::vector<net::NetworkConnection> GetNetworkConnections(const Process& p, const ConnectionType type);
-			std::vector<OpenFile> GetOpenFiles(const Process& p);
-			std::vector<vm_area> GetMMaps(const Process& p);
+		std::vector<Process> GetProcessList();
+		std::vector<net::NetworkConnection> GetNetworkConnections(const Process& p, const ConnectionType type);
+		std::vector<OpenFile> GetOpenFiles(const Process& p);
+		std::vector<vm_area> GetMMaps(const Process& p);
 
-			status_t RegisterSyscall(SyscallEvent& ev);
-			status_t DeRegisterSyscall(SyscallEvent& ev);
-			bool ProcessSyscall(const SyscallBreakpoint* ev, void* data, vmi_instance_t);
+		status_t RegisterSyscall(SyscallEvent& ev);
+		status_t DeRegisterSyscall(SyscallEvent& ev);
+		bool ProcessSyscall(const SyscallBreakpoint* ev, void* data, vmi_instance_t);
 
-			status_t PauseSyscall(SyscallEvent& ev);
-			status_t ResumeSyscall(SyscallEvent& ev);
+		status_t PauseSyscall(SyscallEvent& ev);
+		status_t ResumeSyscall(SyscallEvent& ev);
 
-			status_t RegisterProcessChange(ProcessChangeEvent& ev);
-			status_t DeRegisterProcessChange(ProcessChangeEvent& ev);
+		status_t RegisterProcessChange(ProcessChangeEvent& ev);
+		status_t DeRegisterProcessChange(ProcessChangeEvent& ev);
 
-			SystemMonitor* GetSystemMonitor() const { return _sm; }
+		SystemMonitor* GetSystemMonitor() const { return _sm; }
 
-			void Stop();
+		void Stop();
 
-			addr_t GetSymbolAddrVa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
-			addr_t GetSymbolAddrPa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
-			
-			void PopulatePageFaultAdress(const vmi_pid_t pid, const addr_t target, EventListener* evl);
-			status_t InvokePageFault(uint64_t total_address_per_inst);
+		addr_t GetSymbolAddrVa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
+		addr_t GetSymbolAddrPa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
+		
+		void PopulatePageFaultAdress(const vmi_pid_t pid, const addr_t target, EventListener* evl);
+		status_t InvokePageFault(uint64_t total_address_per_inst);
 
-			status_t InvokeCommand(const vmi_pid_t pid, std::string command, EventListener* evl);
+		status_t InvokeCommand(const vmi_pid_t pid, std::string command, EventListener* evl);
 
-			bool ProcessCR3CodeInjection(vmi_instance_t vmi, vmi_event_t *event);
-			bool ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi);
+		Process InjectELF(const Process& p, const std::string executable);
+		void ExtractFile(const Process& p, const std::string file, const std::string out);
 
-			std::pair<addr_t, addr_t> GetCodeArea(vmi_pid_t pid);
-		private:
-			addr_t _tgid_offset, _name_offset, _mm_offset, _tasks_offset, _parent_offset, _pgd_offset, _real_cred_offset, _uid_offset, _fs_offset, _pwd_offset;
-			addr_t _dentry_d_name_offset, _dentry_parent_offset;
-			addr_t _files_offset, _fdt_offset, _fd_offset, _f_mode_offset, _f_path_offset;
-			addr_t _private_data_offset, _sk_offset, _u1_offset, _u3_offset;
-			addr_t _vm_end_offset, _vm_flags_offset, _vm_file_offset, _vm_pgoff_offset, _vm_next_offset, _exe_file_offset;
-			addr_t _code_start_offset, _code_end_offset;
+		bool ProcessCR3CodeInjection(vmi_instance_t vmi, vmi_event_t *event);
+		bool ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi);
 
-			addr_t _thread_struct_offset, _sp_offset, _sp0_offset, _sp_on_pt_regs_offset, _ip_on_pt_regs_offset, _current_task_offset;
-			addr_t _socket_type_offset, _socket_family;
+		std::pair<addr_t, addr_t> GetCodeArea(vmi_pid_t pid);
+	private:
+		addr_t _tgid_offset, _name_offset, _mm_offset, _tasks_offset, _parent_offset, _pgd_offset, _real_cred_offset, _uid_offset, _fs_offset, _pwd_offset;
+		addr_t _dentry_d_name_offset, _dentry_parent_offset;
+		addr_t _files_offset, _fdt_offset, _fd_offset, _f_mode_offset, _f_path_offset;
+		addr_t _private_data_offset, _sk_offset, _u1_offset, _u3_offset;
+		addr_t _vm_end_offset, _vm_flags_offset, _vm_file_offset, _vm_pgoff_offset, _vm_next_offset, _exe_file_offset;
+		addr_t _code_start_offset, _code_end_offset;
 
-			std::string d_path(addr_t path, vmi_instance_t vmi);
-			uint32_t create_path(addr_t dentry, char* buf, vmi_instance_t vmi);
+		addr_t _thread_struct_offset, _sp_offset, _sp0_offset, _sp_on_pt_regs_offset, _ip_on_pt_regs_offset, _current_task_offset;
+		addr_t _socket_type_offset, _socket_family;
 
-			addr_t GetSyscallAddrVA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
-			addr_t GetSyscallAddrPA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
+		std::string d_path(addr_t path, vmi_instance_t vmi);
+		uint32_t create_path(addr_t dentry, char* buf, vmi_instance_t vmi);
 
-			status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, std::string command, EventListener* evl);
+		addr_t GetSyscallAddrVA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
+		addr_t GetSyscallAddrPA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
 
-			EventManager<int, const SyscallEvent*> _SyscallEvents64;
-			EventManager<int, const SyscallEvent*> _SyscallEvents32;
-			std::map<int, const SyscallBreakpoint> _Syscallbps64;
-			std::map<int, const SyscallBreakpoint> _Syscallbps32;
-			SyscallProcessor _syscallProc;
+		status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, std::string command, EventListener* evl);
 
-			uint64_t _total_address_per_inst;
+		EventManager<int, const SyscallEvent*> _SyscallEvents64;
+		EventManager<int, const SyscallEvent*> _SyscallEvents32;
+		std::map<int, const SyscallBreakpoint> _Syscallbps64;
+		std::map<int, const SyscallBreakpoint> _Syscallbps32;
+		SyscallProcessor _syscallProc;
 
-			ElfHelper* _eh;
-			std::string _binaryPathTemp;
-			char* _binaryMap;
+		uint64_t _total_address_per_inst;
 
-			ProcessChangeEvent* _process_change;
-			std::vector<CodeInjection> _code_injections;
-			CodeInjectionProcessorCr3 _code_injection_proc_cr3;
-			CodeInjectionProcessorInt3 _code_injection_proc_int3;
+		ElfHelper* _eh;
+		std::string _binaryPathTemp;
+		char* _binaryMap;
+
+		ProcessChangeEvent* _process_change;
+		std::vector<CodeInjection> _code_injections;
+		CodeInjectionProcessorCr3 _code_injection_proc_cr3;
+		CodeInjectionProcessorInt3 _code_injection_proc_int3;
 	};
 }
 

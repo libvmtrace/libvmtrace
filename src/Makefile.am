@@ -24,7 +24,8 @@ libvmtrace_la_SOURCES = sys/SystemMonitor.cpp \
 						sys/SyscallJson.cpp \
 						sys/RegisterMechanism.cpp \
 						sys/Xen.cpp \
-						sys/LinuxELFInjector.cpp
+						sys/LinuxELFInjector.cpp \
+						sys/LinuxFileExtractor.cpp
 
 libvmtrace_la_SOURCES += sys/DwarfHelper.cpp \
 						../libdwarfparser/libdwarfparser/array.cpp \
