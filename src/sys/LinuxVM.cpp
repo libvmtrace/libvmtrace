@@ -1,6 +1,8 @@
 
 #include <sys/LinuxVM.hpp>
 #include <sys/types.h>
+#include <sys/LinuxELFInjector.hpp>
+#include <sys/LinuxFileExtractor.hpp>
 #include <chrono>
 
 namespace libvmtrace
@@ -1619,6 +1621,51 @@ namespace libvmtrace
 #endif
 
 		return VMI_SUCCESS;
+	}
+
+	Process LinuxVM::InjectELF(const Process& p, const std::string executable)
+	{
+		// TODO: we want to use smart pointers everywhere,
+		// so transition to enable_shared_from_this
+		// soon (TM). this is just a dirty hack so we can call
+		// into the elf injector part.
+		std::shared_ptr<SystemMonitor> sm(std::shared_ptr<SystemMonitor>{}, _sm);
+		std::shared_ptr<LinuxVM> vm(std::shared_ptr<LinuxVM>{}, this);
+
+		// read the executable to inject from disk.
+		std::ifstream file(executable, std::ios::binary);
+		const auto exe = std::make_shared<std::vector<uint8_t>>(
+			std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+
+		// pass it into the wrapping class.
+		LinuxELFInjector elf(sm, vm, p);
+		return elf.inject_executable(exe);
+	}
+	
+	void LinuxVM::ExtractFile(const Process& p, const std::string file, const std::string out)
+	{
+		using namespace file_extraction;
+
+		// TODO: configure the agent path here.
+		// maybe retrieve it as parameter?
+		constexpr auto agent_path = "";
+
+		// TODO: we want to use smart pointers everywhere,
+		// so transition to enable_shared_from_this
+		// soon (TM). this is just a dirty hack so we can call
+		// into the file extractor part.
+		std::shared_ptr<SystemMonitor> sm(std::shared_ptr<SystemMonitor>{}, _sm);
+		std::shared_ptr<LinuxVM> vm(std::shared_ptr<LinuxVM>{}, this);
+		
+		// prepare extraction agent and setup communication.
+		const auto child = InjectELF(p, agent_path);
+		LinuxFileExtractor extractor(sm, vm, child, agent_path);
+
+		// request the file and dump it onto local filesystem.
+		extractor.request_file(file);
+		extractor.open_file(out);
+		while (extractor.read_chunk()) { /* nothing */ }
+		extractor.close_file();
 	}
 
 	status_t LinuxVM::RegisterProcessChange(ProcessChangeEvent& ev)
