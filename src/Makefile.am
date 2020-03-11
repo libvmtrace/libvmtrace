@@ -1,7 +1,5 @@
 AM_CXXFLAGS = -pg -fpic -O0 $(GLIB_CFLAGS) $(DEPS_CFLAGS) -I ../rapidjson/include/ -I ../libdwarfparser/ -I ../libdwarfparser/common/
 
-LDADD = -lxen 
-
 libvmtrace_la_CPPFLAGS = -ggdb $(GLIB_CFLAGS) -lvmi -ldwarf
 
 lib_LTLIBRARIES = libvmtrace.la
@@ -11,6 +9,12 @@ pkginclude_HEADERS = libvmtrace.hpp
 if VMTRACE_DEBUG
 libvmtrace_la_CPPFLAGS += -DVMTRACE_DEBUG
 endif
+
+bin_PROGRAMS = LinuxFileExtractionAgent
+
+LinuxFileExtractionAgent_SOURCES = agent/LinuxFileExtractionAgent.cpp
+LinuxFileExtractionAgent_LDADD = -lrt
+LinuxFileExtractionAgent_LDFLAGS = -all-static
 
 libvmtrace_la_SOURCES = sys/SystemMonitor.cpp \
 						sys/Int3.cpp \

@@ -4,8 +4,8 @@ AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_SRCDIR([src/config.h.in])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AM_CXXFLAGS="$AM_CXXFLAGS -std=c++17 -U__STRICT_ANSI__ -ggdb -Wall -Werror -pedantic"
-CXXFLAGS="$CXXFLAGS -std=c++17 -U__STRICT_ANSI__ -Wall -Werror -pedantic"
+AM_CXXFLAGS="$AM_CXXFLAGS -std=c++17 -U__STRICT_ANSI__ -ggdb -Wall -pedantic"
+CXXFLAGS="$CXXFLAGS -std=c++17 -U__STRICT_ANSI__ -Wall -pedantic"
 CPPFLAGS="$CPPFLAGS -U__STRICT_ANSI__ -ggdb -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -lglib-2.0 -I/usr/local/include"
 
 AC_LANG([C++])
