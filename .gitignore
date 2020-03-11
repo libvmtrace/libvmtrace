@@ -51,6 +51,7 @@ src/sys/.deps/
 src/sys/.dirstamp
 src/util/.deps/
 src/util/.dirstamp
+src/LinuxFileExtractionClient
 stamp-h1
 Makefile
 configure
