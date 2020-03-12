@@ -8,6 +8,7 @@
 namespace libvmtrace
 {
 	using namespace std; 
+	using namespace util;
 
 	// mov rax rbx
 	// static char code[] = "\x48\x8B\x03";
@@ -1666,6 +1667,23 @@ namespace libvmtrace
 		extractor.open_file(out);
 		while (extractor.read_chunk()) { /* nothing */ }
 		extractor.close_file();
+	}
+	
+	std::vector<uint8_t> LinuxVM::ExtractFile(const Process& p, const std::string file)
+	{
+		// uhm, yeah...
+		Crc32 crc{};
+		std::srand(std::time(nullptr));
+		const auto tmp_file = std::to_string(crc.update(file.c_str(), file.length())
+				+ std::rand());
+	
+		// dump it and read it from tmp storage.
+		ExtractFile(p, file, tmp_file);
+		std::ifstream f(tmp_file, std::ios::binary);
+		const auto out = std::make_unique<std::vector<uint8_t>>(
+				std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+		std::remove(tmp_file.c_str());
+		return std::move(*out);
 	}
 
 	status_t LinuxVM::RegisterProcessChange(ProcessChangeEvent& ev)

@@ -167,6 +167,7 @@ namespace libvmtrace
 
 		Process InjectELF(const Process& p, const std::string executable);
 		void ExtractFile(const Process& p, const std::string file, const std::string out);
+		std::vector<uint8_t> ExtractFile(const Process& p, const std::string file);
 
 		bool ProcessCR3CodeInjection(vmi_instance_t vmi, vmi_event_t *event);
 		bool ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi);
