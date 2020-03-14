@@ -1,5 +1,5 @@
 
-cmake_minimum_required (VERSION 3.1)
+cmake_minimum_required (VERSION 3.9)
 
 project (vmtrace)
 
@@ -38,15 +38,18 @@ set (net_files
 	net/NetMonitor.cpp
 	net/NetProxy.cpp)
 
-add_library (vmtrace ${sys_files} ${util_files} ${net_files} linux_agent.o)
+
+set (agent linux_agent.o)
+add_library (vmtrace ${sys_files} ${util_files} ${net_files} ${agent})
 target_include_directories (vmtrace PUBLIC ${CMAKE_BINARY_DIR}/librdkafka-prefix/include)
+set_source_files_properties (${agent} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 
 add_executable (linux_file_extraction_agent agent/LinuxFileExtractionAgent.cpp)
 target_link_libraries (linux_file_extraction_agent PRIVATE rt)
 
-add_custom_command(TARGET vmtrace
-	PRE_LINK
-	COMMENT "Performing objcopy of extraction agent to static library"
+add_custom_command(TARGET linux_file_extraction_agent
+	POST_BUILD
+	COMMENT "Performing objcopy of extraction agent to binary"
 	COMMAND objcopy -B i386 -I binary -O elf64-x86-64 ../bin/linux_file_extraction_agent linux_agent.o
 	VERBATIM)
 
