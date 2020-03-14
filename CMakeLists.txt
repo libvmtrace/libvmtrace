@@ -47,6 +47,25 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib
 	${CMAKE_CURRENT_BINARY_DIR}/librdkafka-prefix/lib
 	${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib)
 
+link_libraries (ssl
+	ssh
+	crypto
+	boost_system
+	boost_regex
+	boost_filesystem
+	boost_program_options
+	curl
+	pthread
+	pcap
+	netfilter_queue
+	elf
+	rdkafka++
+	dwarf
+	dwarfparser
+	vmiwrapper
+	vmi
+	xenctrl)
+
 add_subdirectory (src)
 add_subdirectory (tests)
 add_subdirectory (apps)

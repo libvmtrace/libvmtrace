@@ -15,8 +15,7 @@ set (test_files
 foreach (test_file ${test_files})
 	string (REPLACE ".cpp" "" final_name ${test_file})
 	add_executable (${final_name} ${test_file})
-	add_dependencies (${final_name} vmtrace)
 	target_include_directories (${final_name} PRIVATE .)
-	target_link_libraries (${final_name} PRIVATE vmtrace)
+	target_link_libraries (${final_name} vmtrace)
 endforeach (test_file ${test_files})
 
