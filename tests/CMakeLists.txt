@@ -25,7 +25,6 @@ set (test_libs
 	netfilter_queue
 	elf
 	rdkafka++
-	vmi
 	vmtrace
 	xenctrl)
 
