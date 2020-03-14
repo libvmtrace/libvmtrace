@@ -12,27 +12,11 @@ set (test_files
 	static_elasticsearch_test.cpp
 	memory_test.cpp)
 
-set (test_libs
-	ssl
-	crypto
-	boost_system
-	boost_regex
-	boost_filesystem
-	boost_program_options
-	curl
-	pthread
-	pcap
-	netfilter_queue
-	elf
-	rdkafka++
-	vmtrace
-	xenctrl)
-
 foreach (test_file ${test_files})
 	string (REPLACE ".cpp" "" final_name ${test_file})
 	add_executable (${final_name} ${test_file})
 	add_dependencies (${final_name} vmtrace)
 	target_include_directories (${final_name} PRIVATE .)
-	target_link_libraries (${final_name} ${test_libs})
+	target_link_libraries (${final_name} PRIVATE vmtrace)
 endforeach (test_file ${test_files})
 
