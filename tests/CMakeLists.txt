@@ -10,6 +10,7 @@ set (test_files
 	static_test_kafka_commander.cpp
 	static_test_altp2m.cpp
 	static_elasticsearch_test.cpp
+	static_test_agent_presence.cpp
 	memory_test.cpp)
 
 foreach (test_file ${test_files})

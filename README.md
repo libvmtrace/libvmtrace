@@ -21,7 +21,7 @@ Dependencies
 Install the following dependencies on Ubuntu / Debian:
 
 ```
-apt-get install libnetfilter-queue-dev libpcap-dev g++ libboost-all-dev automake libtool git libglib2.0-dev g++ libjson-c-dev libxen-dev byacc make netcat libelf-dev libssl-dev flex libdwarf-dev cmake flex bison libglib2.0-dev libvirt-dev libjson-c-dev libyajl-dev colormake libssh-dev libcurl4-openssl-dev uuid-dev
+apt install libnetfilter-queue-dev libpcap-dev g++ libboost-all-dev automake libtool git libglib2.0-dev g++ libjson-c-dev libxen-dev byacc make netcat libelf-dev libssl-dev flex libdwarf-dev cmake flex bison libglib2.0-dev libvirt-dev libjson-c-dev libyajl-dev colormake libssh-dev libcurl4-openssl-dev uuid-dev
 ```
 
 For other operating systems, refer to your package database.
@@ -34,8 +34,7 @@ Installation
 git clone https://github.com/libvmtrace/libvmtrace
 
 # download dependencies
-cd libvmtrace
-git submodule update --init
+cd libvmtrace && git submodule update --init
 
 # build the library and examples
 mkdir -p build && cd build && cmake .. && make

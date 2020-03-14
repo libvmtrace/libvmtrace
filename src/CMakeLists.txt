@@ -38,11 +38,18 @@ set (net_files
 	net/NetMonitor.cpp
 	net/NetProxy.cpp)
 
-add_library (vmtrace ${sys_files} ${util_files} ${net_files})
-add_dependencies (vmtrace libvmi librdkafka libdwarfparser)
+add_library (vmtrace ${sys_files} ${util_files} ${net_files} linux_agent.o)
 target_include_directories (vmtrace PUBLIC ${CMAKE_BINARY_DIR}/librdkafka-prefix/include)
 
 add_executable (linux_file_extraction_agent agent/LinuxFileExtractionAgent.cpp)
 target_link_libraries (linux_file_extraction_agent PRIVATE rt)
-add_dependencies (linux_file_extraction_agent vmtrace)
+
+add_custom_command(TARGET vmtrace
+	PRE_LINK
+	COMMENT "Performing objcopy of extraction agent to static library"
+	COMMAND objcopy -B i386 -I binary -O elf64-x86-64 ../bin/linux_file_extraction_agent linux_agent.o
+	VERBATIM)
+
+add_dependencies (vmtrace linux_file_extraction_agent)
+add_dependencies (linux_file_extraction_agent libvmi librdkafka libdwarfparser)
 

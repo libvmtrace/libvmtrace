@@ -209,6 +209,9 @@ namespace libvmtrace
 		CodeInjectionProcessorCr3 _code_injection_proc_cr3;
 		CodeInjectionProcessorInt3 _code_injection_proc_int3;
 	};
+
+	extern uint8_t linux_agent_start[] asm("_binary____bin_linux_file_extraction_agent_start");
+	extern uint8_t linux_agent_end[] asm("_binary____bin_linux_file_extraction_agent_end");
 }
 
 #endif
