@@ -29,9 +29,10 @@ include (ExternalProject)
 ExternalProject_Add(libvmi
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>)
+set (libdwarfparser_helper env LDFLAGS=-L${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib ./configure)
 ExternalProject_Add(libdwarfparser
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libdwarfparser
-	CONFIGURE_COMMAND ./autogen.sh && ./configure --prefix=<INSTALL_DIR>
+	CONFIGURE_COMMAND ./autogen.sh && ${libdwarfparser_helper} --prefix=<INSTALL_DIR>
 	BUILD_IN_SOURCE 1)
 ExternalProject_Add(librdkafka
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/librdkafka
