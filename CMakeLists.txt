@@ -38,6 +38,9 @@ ExternalProject_Add(librdkafka
 	CONFIGURE_COMMAND ./configure --prefix=<INSTALL_DIR>
 	BUILD_IN_SOURCE 1)
 
+# dependencies between the dependencies...
+add_dependencies (libdwarfparser libvmi)
+
 # add the dependencies to the linker path
 link_directories (${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib
 	${CMAKE_CURRENT_BINARY_DIR}/librdkafka-prefix/lib
