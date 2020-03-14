@@ -41,7 +41,7 @@ set (net_files
 add_library (vmtrace ${sys_files} ${util_files} ${net_files})
 add_dependencies (vmtrace libvmi librdkafka)
 target_include_directories (vmtrace PUBLIC ${CMAKE_BINARY_DIR}/librdkafka-prefix/include)
-target_link_libraries (vmtrace PUBLIC vmi)
+target_link_libraries (vmtrace PUBLIC vmi dwarf)
 
 add_executable (linux_file_extraction_agent agent/LinuxFileExtractionAgent.cpp)
 target_link_libraries (linux_file_extraction_agent PRIVATE rt)

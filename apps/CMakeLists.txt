@@ -41,13 +41,11 @@ set (apps_libs
 	vmtrace
 	xenctrl)
 
-remove_definitions (-Dlinux)
-
 foreach (apps_file ${apps_files})
 	string (REPLACE ".cpp" "" final_name ${apps_file})
 	add_executable (${final_name} ${apps_file} ${helper_files} ${plugin_files})
 	add_dependencies (${final_name} libdwarfparser librdkafka vmtrace)
 	target_include_directories (${final_name} PRIVATE .)
-	target_link_libraries (${final_name} ${apps_libs})
+	target_link_libraries (${final_name} PUBLIC ${apps_libs})
 endforeach (apps_file ${apps_files})
 
