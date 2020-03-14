@@ -34,6 +34,7 @@ set (apps_libs
 	netfilter_queue
 	elf
 	rdkafka++
+	dwarf
 	dwarfparser
 	vmiwrapper
 	vmi
