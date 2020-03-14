@@ -1,15 +1,15 @@
-[submodule "rapidjson"]
-	path = rapidjson
+[submodule "contrib/rapidjson"]
+	path = contrib/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
-[submodule "spdlog"]
-	path = spdlog
+[submodule "contrib/spdlog"]
+	path = contrib/spdlog
 	url = https://github.com/gabime/spdlog.git
-[submodule "libdwarfparser"]
-	path = libdwarfparser
+[submodule "contrib/libdwarfparser"]
+	path = contrib/libdwarfparser
 	url = https://github.com/ssentanoe/libdwarfparser
-[submodule "libvmi"]
-	path = libvmi
+[submodule "contrib/libvmi"]
+	path = contrib/libvmi
 	url = https://github.com/libvmi/libvmi.git
-[submodule "librdkafka"]
-	path = librdkafka
+[submodule "contrib/librdkafka"]
+	path = contrib/librdkafka
 	url = https://github.com/edenhill/librdkafka
