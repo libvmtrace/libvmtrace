@@ -29,7 +29,7 @@ include (ExternalProject)
 ExternalProject_Add(libvmi
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>)
-set (libdwarfparser_flags "-I${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi -DLIBVMI_EXTRA_GLIB -Wl,--whole-archive,-ldwarf,--no-whole-archive")
+set (libdwarfparser_flags "-I${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi -DLIBVMI_EXTRA_GLIB")
 ExternalProject_Add(libdwarfparser
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libdwarfparser
 	CONFIGURE_COMMAND ./autogen.sh && ./configure LDFLAGS=-L${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib CPPFLAGS=${libdwarfparser_flags} --prefix=<INSTALL_DIR>
