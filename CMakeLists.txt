@@ -1,8 +1,7 @@
 
 cmake_minimum_required (VERSION 3.1)
 
-# this cannot be defined per target, because cmake cannot set the whole-archive property per target.
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++17 -Ulinux -Wl,--whole-archive,-ldwarf,--no-whole-archive")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++17 -Ulinux")
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -30,7 +29,7 @@ include (ExternalProject)
 ExternalProject_Add(libvmi
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>)
-set (libdwarfparser_flags "-I${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi -DLIBVMI_EXTRA_GLIB")
+set (libdwarfparser_flags "-I${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi -DLIBVMI_EXTRA_GLIB -Wl,--whole-archive,-ldwarf,--no-whole-archive")
 ExternalProject_Add(libdwarfparser
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libdwarfparser
 	CONFIGURE_COMMAND ./autogen.sh && ./configure LDFLAGS=-L${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib CPPFLAGS=${libdwarfparser_flags} --prefix=<INSTALL_DIR>
