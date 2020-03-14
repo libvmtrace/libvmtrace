@@ -15,45 +15,30 @@ Libvmtrace was used for the following research papers:
 [![Build status](https://travis-ci.org/libvmtrace/libvmtrace.svg?branch=master)](https://travis-ci.org/libvmtrace/libvmtrace)
 
 
-Installation
+Dependencies
 ============
 
+Install the following dependencies on Ubuntu / Debian:
 
 ```
 apt-get install libnetfilter-queue-dev libpcap-dev g++ libboost-all-dev automake libtool git libglib2.0-dev g++ libjson-c-dev libxen-dev byacc make netcat libelf-dev libssl-dev flex libdwarf-dev cmake flex bison libglib2.0-dev libvirt-dev libjson-c-dev libyajl-dev colormake libssh-dev libcurl4-openssl-dev uuid-dev
 ```
 
-Clone and Submodules
+For other operating systems, refer to your package database.
+
+Installation
 ============
 
 ```
+# retrieve the source code
 git clone https://github.com/libvmtrace/libvmtrace
+
+# download dependencies
 cd libvmtrace
-git submodule init
-git submodule update
+git submodule update --init
 
-cd libvmi
-mkdir build
-cd build
-cmake -DENABLE_KVM=OFF ..
-make
-make install
-
-cd ../../librdkafka
-./configure
-make
-make install
-
-ldconfig
-```
-
-Compile
-=======
-
-```
-./autogen.sh
-./configure
-colormake
+# build the library and examples
+mkdir -p build && cd build && cmake .. && make
 ```
 
 Saracenia JSON

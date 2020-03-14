@@ -1,11 +1,5 @@
 # Ignore the build and lib dirs
 build
-lib/*
-libs
-obj
-
-# Ignore any executables
-bin/*
 
 # Ignore Mac specific files
 .DS_Store
@@ -13,64 +7,19 @@ bin/*
 
 # Ignore Clion files
 .idea/
-CMakeLists.txt
-
-*.o
-*.lo
-m4
-
-Makefile.in
-aclocal.m4
-apps/.deps/
-apps/Makefile
-apps/Makefile.in
-apps/.libs
-apps/malware_tracer
-autom4te.cache/
-autoscan.log
-compile
-config.guess
-config.h
-config.h.in
-config.h.in~
-config.log
-config.status
-config.sub
-depcomp
-install-sh
-libtool
-ltmain.sh
-missing
-src/Makefile.in
-src/autoscan.log
-src/config.h
-src/config.h.in
-src/config.h.in~
-src/stamp-h1
-src/sys/.deps/
-src/sys/.dirstamp
-src/util/.deps/
-src/util/.dirstamp
-src/LinuxFileExtractionAgent
-stamp-h1
-Makefile
-configure
-src/.libs
-*.la
-apps/.libs
-gmon.out
-apps/gmon.out
-*.deps
-*.dirstamp
-
 log.txt
 .DS_Store
 
-tests/Makefile
-tests/Makefile.in
-tests/.libs
-tests/*.o
-tests/.deps/
+# Ignore build system related stuff
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
 
-apps/*_app
-tests/*_app
