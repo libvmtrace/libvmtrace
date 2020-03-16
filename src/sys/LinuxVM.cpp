@@ -936,6 +936,30 @@ namespace libvmtrace
 		return pa;
 	}
 
+	addr_t LinuxVM::GetSymbolAddrVa(const uint8_t* binary, const Process& p, const std::string symbolName, const bool onlyFunctions)
+	{
+		addr_t va = 0;
+		int len = 0;
+
+		const auto offset = _eh->elf_get_symbol_addr(const_cast<uint8_t*>(binary),
+				".symtab", symbolName.c_str(), onlyFunctions);
+		const auto maps = GetMMaps(p);
+
+		for (const auto& entry : maps)
+		{
+			if (onlyFunctions && !(entry.flags & 0x4))
+				continue;
+
+			if (entry.path.find(p.GetName()) != string::npos)
+			{
+				va = entry.start + offset;
+				break;
+			}
+		}
+		
+		return va;
+	}
+
 	bool LinuxVM::ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi)
 	{
 		BPEventData* a = (BPEventData*) data;
@@ -1624,7 +1648,7 @@ namespace libvmtrace
 		return VMI_SUCCESS;
 	}
 
-	Process LinuxVM::InjectELF(const Process& p, const std::string executable)
+	Process LinuxVM::InjectELF(const Process& p, std::vector<uint8_t>& executable)
 	{
 		// TODO: we want to use smart pointers everywhere,
 		// so transition to enable_shared_from_this
@@ -1632,24 +1656,26 @@ namespace libvmtrace
 		// into the elf injector part.
 		std::shared_ptr<SystemMonitor> sm(std::shared_ptr<SystemMonitor>{}, _sm);
 		std::shared_ptr<LinuxVM> vm(std::shared_ptr<LinuxVM>{}, this);
-
-		// read the executable to inject from disk.
-		std::ifstream file(executable, std::ios::binary);
-		const auto exe = std::make_shared<std::vector<uint8_t>>(
-			std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-
+		std::shared_ptr<std::vector<uint8_t>> exe(
+				std::shared_ptr<std::vector<uint8_t>>{}, &executable);
+		
 		// pass it into the wrapping class.
 		LinuxELFInjector elf(sm, vm, p);
 		return elf.inject_executable(exe);
 	}
 	
+	Process LinuxVM::InjectELF(const Process& p, const std::string executable)
+	{
+		// read the executable to inject from disk.
+		std::ifstream file(executable, std::ios::binary);
+		const auto exe = std::make_shared<std::vector<uint8_t>>(
+			std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+		return InjectELF(p, *exe);
+	}
+	
 	void LinuxVM::ExtractFile(const Process& p, const std::string file, const std::string out)
 	{
 		using namespace file_extraction;
-
-		// TODO: configure the agent path here.
-		// maybe retrieve it as parameter?
-		constexpr auto agent_path = "";
 
 		// TODO: we want to use smart pointers everywhere,
 		// so transition to enable_shared_from_this
@@ -1659,8 +1685,10 @@ namespace libvmtrace
 		std::shared_ptr<LinuxVM> vm(std::shared_ptr<LinuxVM>{}, this);
 		
 		// prepare extraction agent and setup communication.
-		const auto child = InjectELF(p, agent_path);
-		LinuxFileExtractor extractor(sm, vm, child, agent_path);
+		std::vector<uint8_t> agent;
+		agent.assign(linux_agent_start, linux_agent_end);
+		const auto child = InjectELF(p, agent);
+		LinuxFileExtractor extractor(sm, vm, child, agent);
 
 		// request the file and dump it onto local filesystem.
 		extractor.request_file(file);
@@ -1671,6 +1699,9 @@ namespace libvmtrace
 	
 	std::vector<uint8_t> LinuxVM::ExtractFile(const Process& p, const std::string file)
 	{
+		// TODO: refactor the wrapping class, so that we can pass a base type
+		// of stream to write each chunk into. the tmp file solution is mediocre at best.
+
 		// uhm, yeah...
 		Crc32 crc{};
 		std::srand(std::time(nullptr));
