@@ -45,23 +45,18 @@ namespace file_extraction
 		: sm(sm), vm(vm), base(0), process(process), pid(process.GetPid())
 	{
 		base = vm->GetSymbolAddrVa(agent_path, process, "mem", false);
-
-		if (READ_SHARED_MEM(magic) != magic_value)
-			throw std::runtime_error("Invalid magic value.");
-		
-		while (READ_SHARED_MEM(buffer) == 0)
-			std::this_thread::sleep_for(sleep_interval);
-
-		if (skip_tree)
-			set_flag(file_extraction::status::skip_tree);
-
-		set_flag(file_extraction::status::endian_match);
-		if (!skip_tree && !wait_for_flag(file_extraction::status::transmitting_file_tree))
-			throw std::runtime_error("Failed when creating in-guest file tree.");
-
-		exchange_buffer = (uintptr_t) malloc(READ_SHARED_MEM(buffer_size));
+		initialize(skip_tree);
 	}
 
+	// constructor of the file extraction class.
+	LinuxFileExtractor::LinuxFileExtractor(const std::shared_ptr<SystemMonitor> sm, const std::shared_ptr<LinuxVM> vm,
+			const Process process, std::vector<uint8_t>& agent, const bool skip_tree)
+		: sm(sm), vm(vm), base(0), process(process), pid(process.GetPid())
+	{
+		base = vm->GetSymbolAddrVa(agent.data(), process, "mem", false);
+		initialize(skip_tree);
+	}
+	
 	// destructor of the file extracion class.
 	LinuxFileExtractor::~LinuxFileExtractor()
 	{
@@ -158,6 +153,25 @@ namespace file_extraction
 	bool LinuxFileExtractor::check_crc()
 	{
 		return exp_crc == mem.crc;
+	}
+
+	// initialize communication.
+	void LinuxFileExtractor::initialize(const bool skip_tree)
+	{
+		if (READ_SHARED_MEM(magic) != magic_value)
+			throw std::runtime_error("Invalid magic value.");
+		
+		while (READ_SHARED_MEM(buffer) == 0)
+			std::this_thread::sleep_for(sleep_interval);
+
+		if (skip_tree)
+			set_flag(file_extraction::status::skip_tree);
+
+		set_flag(file_extraction::status::endian_match);
+		if (!skip_tree && !wait_for_flag(file_extraction::status::transmitting_file_tree))
+			throw std::runtime_error("Failed when creating in-guest file tree.");
+
+		exchange_buffer = (uintptr_t) malloc(READ_SHARED_MEM(buffer_size));
 	}
 
 	// enable a single flag.
