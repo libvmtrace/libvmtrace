@@ -42,6 +42,11 @@ namespace libvmtrace
 		// this should be a mutex + condition variable instead, but meh.
 		do { std::this_thread::sleep_for(4ms); } while(!finished);
 
+		// clear out the cache.
+		LockGuard guard(sm);
+		vmi_v2pcache_flush(guard.get(), ~0ull);
+		vmi_pidcache_flush(guard.get());
+
 		// return pid.
 		return *child;
 	}
