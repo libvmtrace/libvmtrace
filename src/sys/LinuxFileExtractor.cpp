@@ -1,6 +1,7 @@
 
 #include <sys/LinuxFileExtractor.hpp>
 #include <sys/LinuxVM.hpp>
+#include <util/LockGuard.hpp>
 
 #define READ_SHARED_MEM(member) [&] () { \
 	const auto vmi = sm->Lock(); \
@@ -53,7 +54,7 @@ namespace file_extraction
 			const Process process, std::vector<uint8_t>& agent, const bool skip_tree)
 		: sm(sm), vm(vm), base(0), process(process), pid(process.GetPid())
 	{
-		base = vm->GetSymbolAddrVa(agent.data(), process, "mem", false);
+		base = vm->GetSymbolAddrVa(agent.data(), process, "memfd:file_extraction", "mem", false);
 		initialize(skip_tree);
 	}
 	
@@ -160,7 +161,7 @@ namespace file_extraction
 	{
 		if (READ_SHARED_MEM(magic) != magic_value)
 			throw std::runtime_error("Invalid magic value.");
-		
+
 		while (READ_SHARED_MEM(buffer) == 0)
 			std::this_thread::sleep_for(sleep_interval);
 

@@ -936,7 +936,7 @@ namespace libvmtrace
 		return pa;
 	}
 
-	addr_t LinuxVM::GetSymbolAddrVa(const uint8_t* binary, const Process& p, const std::string symbolName, const bool onlyFunctions)
+	addr_t LinuxVM::GetSymbolAddrVa(const uint8_t* binary, const Process& p, const std::string path, const std::string symbolName, const bool onlyFunctions)
 	{
 		addr_t va = 0;
 		int len = 0;
@@ -950,7 +950,7 @@ namespace libvmtrace
 			if (onlyFunctions && !(entry.flags & 0x4))
 				continue;
 
-			if (entry.path.find(p.GetName()) != string::npos)
+			if (entry.path.find(path) != string::npos)
 			{
 				va = entry.start + offset;
 				break;
@@ -1693,7 +1693,7 @@ namespace libvmtrace
 		// request the file and dump it onto local filesystem.
 		extractor.request_file(file);
 		extractor.open_file(out);
-		while (extractor.read_chunk()) { /* nothing */ }
+		while (!extractor.read_chunk()) { /* nothing */ }
 		extractor.close_file();
 	}
 	

@@ -8,6 +8,8 @@
 #include <cassert>
 #include <algorithm>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 using namespace libvmtrace::file_extraction;
 using namespace libvmtrace::util;
@@ -116,7 +118,8 @@ bool read_file_to_buffer(const std::string& path)
 int main()
 {
 	// print debug information.
-	std::cout << "Shared memory at: " << std::hex << &mem << std::endl;
+	std::cout << "Shared memory at: " << std::hex << &mem <<
+		" [" << std::dec << getpid() << "]" << std::endl;
 
 	// allocate memory and lock into virutal memory.
 	mem.buffer_size = default_size;
@@ -125,7 +128,6 @@ int main()
 
 	// wait for the host system to acknowledge our endianness.
 	std::cout << "Waiting for endianness acknowledge." << std::endl;
-	mem.status = 0;
 	AWAIT_FLAG(status::endian_match);
 	std::cout << "Acknowledged endianness, transmitting file tree..." << std::endl;
 

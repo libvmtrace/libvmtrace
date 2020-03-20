@@ -95,9 +95,10 @@ namespace libvmtrace
 		vmi_v2pcache_flush(guard.get(), ~0ull);
 
 		// store off the 'duplicated' child process now.
+		const auto child_pid = child->GetPid();
 		const auto plist = vm->GetProcessList();
 		const auto result = std::find_if(plist.begin(), plist.end(),
-			[&](const auto& p) -> bool { return p.GetParentPid() == parent.GetPid(); });
+			[&](const auto& p) -> bool { return p.GetPid() == child_pid; });
 
 		if (result == plist.end())
 		{
