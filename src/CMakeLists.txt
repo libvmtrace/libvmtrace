@@ -45,7 +45,8 @@ target_include_directories (vmtrace PUBLIC ${CMAKE_BINARY_DIR}/librdkafka-prefix
 set_source_files_properties (${agent} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 
 add_executable (linux_file_extraction_agent agent/LinuxFileExtractionAgent.cpp)
-target_link_libraries (linux_file_extraction_agent PRIVATE rt)
+set_property (TARGET linux_file_extraction_agent PROPERTY LINK_LIBRARIES "")
+target_link_libraries (linux_file_extraction_agent PRIVATE pthread rt -static-libgcc -static-libstdc++)
 
 add_custom_command(TARGET linux_file_extraction_agent
 	POST_BUILD
