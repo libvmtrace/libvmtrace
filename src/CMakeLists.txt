@@ -18,7 +18,8 @@ set (sys_files
 	sys/Xen.cpp
 	sys/LinuxELFInjector.cpp
 	sys/LinuxFileExtractor.cpp
-	sys/DwarfHelper.cpp)
+	sys/DwarfHelper.cpp
+	sys/PrimitiveInjectionStrategy.cpp)
 
 set (util_files
 	util/utils.cpp

@@ -11,6 +11,7 @@
 #include <thread>
 #include <iostream>
 #include <unistd.h>
+#include <sys/CodeInjection.hpp>
 
 namespace libvmtrace
 {
@@ -27,7 +28,9 @@ namespace libvmtrace
 		public:
 			SystemMonitor(const std::string name, const bool event_support) :
 				_name(name), _initialized(false), _event_support(event_support), _bpm(nullptr),
-				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0) { }
+				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0),
+	       			_inj(std::make_shared<PrimitiveInjectionStrategy>(
+							std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this))) { }
 
 			~SystemMonitor();
 
@@ -124,6 +127,7 @@ namespace libvmtrace
 			bpm_type_t _bpm_type;
 
 			RegisterMechanism* _rm;
+			std::shared_ptr<InjectionStrategy> _inj;
 
 			std::vector<addr_t> _exclude_addresses;
 
