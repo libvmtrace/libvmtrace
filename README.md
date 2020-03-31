@@ -40,7 +40,14 @@ cd libvmtrace && git submodule update --init
 mkdir -p build && cd build && cmake .. && make
 ```
 
-Saracenia JSON
+Linux File Extraction Agent
+=======
+
+This project includes a precompiled agent that can be used to extract files from Linux virtual machines.
+To use this feature, you need atleast Linux 3.19 on the guest system.
+If you want to supply your own extraction agent (for example when porting this feature to other operating systems), supply a custom injection routine like LinuxVM::ExtractFile.
+
+Saracenia Configuration
 =======
 
 * bp_type (1 -> int3, 2 -> altp2m basic)
