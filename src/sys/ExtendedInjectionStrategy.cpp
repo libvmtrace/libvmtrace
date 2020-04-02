@@ -2,7 +2,6 @@
 #include <sys/CodeInjection.hpp>
 #include <util/LockGuard.hpp>
 
-
 namespace libvmtrace
 {
 	using namespace util;
@@ -18,7 +17,10 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 		xen = std::make_shared<Xen>(vmi_get_vmid(guard.get()));
-		
+	
+		// enable altp2m support.
+		EnableAltp2m();
+
 		// create our sink page.
 		xen->GetMaxGFN(&last_page);
 		sink_page = AllocatePage();
@@ -28,7 +30,7 @@ namespace libvmtrace
 		memset(mask, 0xFF, sizeof(mask));
 		if (vmi_write_pa(guard.get(), page_to_addr(sink_page), sizeof(mask), &mask, nullptr) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to mask sink page.");
-	
+
 		// create read / write view.
 		if (vmi_slat_create(guard.get(), &view_rw) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to create r/w view.");
@@ -221,6 +223,32 @@ namespace libvmtrace
 	{
 		const auto current = xen->GetMaxMem();
 		xen->SetMaxMem(current + delta);
+	}
+
+	void ExtendedInjectionStrategy::EnableAltp2m() const
+	{
+		LockGuard guard(sm);
+		const auto vmi_id = vmi_get_vmid(guard.get());
+
+		// open xenctrl interface.
+		const auto xc = xc_interface_open(nullptr, nullptr, 0);
+
+		// grab current value of ALTP2M.
+		uint64_t current_altp2m;
+		if (xc_hvm_param_get(xc, vmi_id, HVM_PARAM_ALTP2M, &current_altp2m) < 0)
+			throw std::runtime_error("Failed to get HVM_PARAM_ALTP2M.");
+
+		// is ALTP2M not at external mode? turn it on.
+		if (current_altp2m != XEN_ALTP2M_external &&
+			xc_hvm_param_set(xc, vmi_id, HVM_PARAM_ALTP2M, XEN_ALTP2M_external) < 0)
+				throw std::runtime_error("Failed to set HVM_PARAM_ALTP2M.");
+
+		// set default domain state.
+		if (xc_altp2m_set_domain_state(xc, vmi_id, 1) < 0)
+			throw std::runtime_error("Failed to get altp2m domain state.");
+
+		// close xenctrl interface.
+		xc_interface_close(xc);
 	}
 }
 

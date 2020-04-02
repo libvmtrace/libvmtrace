@@ -2,6 +2,10 @@
 #ifndef CODE_INJECTION_H
 #define CODE_INJECTION_H
 
+#define LIBXL_API_VERSION 0x040500
+#define XC_WANT_COMPAT_EVTCHN_API 1
+#define XC_WANT_COMPAT_MAP_FOREIGN_API 1
+
 #include <algorithm>
 #include <vector>
 #include <memory>
@@ -9,6 +13,14 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 #include <sys/Xen.hpp>
+
+// this is needed so that the function signatures are not mangled,
+// so that ldd can link against libxenctrl.so without problems.
+extern "C"
+{
+	#include <libxl_utils.h>
+	#include <xenctrl.h>
+}
 
 namespace libvmtrace
 {
@@ -130,6 +142,7 @@ namespace libvmtrace
 		uint64_t AllocatePage();
 		void FreePage(uint64_t page);
 		void AdjustMemoryCapacity(int64_t delta);
+		void EnableAltp2m() const;
 
 		std::vector<ShadowPage> shadow_pages;
 		std::shared_ptr<Xen> xen;
