@@ -9,6 +9,13 @@ namespace libvmtrace
 
 	ExtendedInjectionStrategy::ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm) : InjectionStrategy(sm)
 	{
+		// we need to do a lazy initialize on the first use,
+		// because at this point VMI is not ready yet,
+		// but we need to create the sink page.
+	}
+
+	void ExtendedInjectionStrategy::Initialize()
+	{
 		LockGuard guard(sm);
 		xen = std::make_shared<Xen>(vmi_get_vmid(guard.get()));
 		
@@ -42,6 +49,10 @@ namespace libvmtrace
 
 	ExtendedInjectionStrategy::~ExtendedInjectionStrategy()
 	{
+		// never initialized...
+		if (!xen)
+			return;
+
 		LockGuard guard(sm);
 
 		// remove event handler.
@@ -60,7 +71,11 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 		assert(patch->vcpu == ALL_VCPU);
-	
+
+		// lazy initialize.
+		if (!xen)
+			Initialize();
+
 		// if we are trying to apply a patch to virtual memory,
 		// translate it into physical memory first.
 		if (patch->pid != 0)

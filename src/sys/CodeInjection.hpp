@@ -119,6 +119,7 @@ namespace libvmtrace
 		virtual bool Apply(std::shared_ptr<Patch> patch) override;
 	
 	private:
+		void Initialize();
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
 
 		static event_response_t HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event);
