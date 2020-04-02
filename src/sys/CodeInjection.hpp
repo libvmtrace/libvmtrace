@@ -7,15 +7,21 @@
 #include <memory>
 #include <climits>
 #include <libvmi/libvmi.h>
+#include <libvmi/events.h>
 #include <sys/Xen.hpp>
 
 namespace libvmtrace
 {
 	inline static constexpr auto ALL_VCPU = ULONG_MAX;
-	inline static constexpr auto PAGE_RANGE = 12; // (1 << 12) = 4096
+	inline static constexpr auto PAGE_RANGE = 12;
+	inline static constexpr auto PAGE_SIZE = 1 << PAGE_RANGE;
 
 	inline addr_t addr_to_page(addr_t addr) { return addr >> PAGE_RANGE; }
 	inline addr_t page_to_addr(addr_t page) { return page << PAGE_RANGE; }
+	inline addr_t translate_page_offset(addr_t from, addr_t to)
+	{
+		return to + from & (PAGE_SIZE - 1);
+	}
 
 	class SystemMonitor;
 
@@ -109,16 +115,26 @@ namespace libvmtrace
 	{
 	public:
 		ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm);
+		virtual ~ExtendedInjectionStrategy() override;
 		virtual bool Apply(std::shared_ptr<Patch> patch) override;
 	
 	private:
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
-	
+
+		static event_response_t HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event);
+
 		ShadowPage ReferenceShadowPage(addr_t page);
-		void UnreferenceShadowPage(addr_t page);
+		ShadowPage UnreferenceShadowPage(addr_t page);
+
+		uint64_t AllocatePage();
+		void FreePage(uint64_t page);
+		void AdjustMemoryCapacity(int64_t delta);
 
 		std::vector<ShadowPage> shadow_pages;
 		std::shared_ptr<Xen> xen;
+		uint64_t last_page, sink_page;
+		uint16_t view_rw, view_x;
+		vmi_event_t mem_event;
 	};
 }
 

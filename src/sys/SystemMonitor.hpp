@@ -26,11 +26,17 @@ namespace libvmtrace
 	class SystemMonitor
 	{
 		public:
-			SystemMonitor(const std::string name, const bool event_support) :
+			SystemMonitor(const std::string name, const bool event_support, const bool ept_support = false) :
 				_name(name), _initialized(false), _event_support(event_support), _bpm(nullptr),
-				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0),
-	       			_inj(std::make_shared<PrimitiveInjectionStrategy>(
-							std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this))) { }
+				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0)
+			{
+				if (ept_support)
+					_inj = std::make_shared<ExtendedInjectionStrategy>(
+							std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
+				else
+					_inj = std::make_shared<PrimitiveInjectionStrategy>(
+							std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
+			}
 
 			~SystemMonitor();
 
