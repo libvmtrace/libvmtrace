@@ -84,7 +84,7 @@ namespace libvmtrace
 				if (std::max(canidate->location, patch->location)
 						<= std::min(canidate->location + canidate->data.size(),
 							patch->location + patch->data.size()))
-					patch->dependencies.push_back(canidate);
+					canidate->dependencies.push_back(canidate);
 			
 			patches.push_back(patch);	
 			return true;
