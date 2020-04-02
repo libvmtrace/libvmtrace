@@ -13,6 +13,7 @@ using namespace libvmtrace;
 // vmtrace wrapper.
 std::shared_ptr<SystemMonitor> sm;
 std::shared_ptr<LinuxVM> vm;
+std::shared_ptr<Int3> bpm;
 
 // shutdown routine.
 void shutdown(int sig)
@@ -24,6 +25,7 @@ void shutdown(int sig)
 		sm->Stop();
 
 	sm = nullptr;
+	bpm = nullptr;
 	vm = nullptr;
 
 	exit(sig);
@@ -66,11 +68,14 @@ int main(int argc, char** argv)
 
 	// create vmtrace wrapper objects.
 	sm = std::make_shared<SystemMonitor>(argv[1], true);
+	bpm = std::make_unique<Int3>(*sm);
+	sm->SetBPM(bpm.get(), bpm->GetType());
 
 	// initialize vmtrace and delegate.
 	try
 	{
 		sm->Init();
+		bpm->Init();
 		vm = std::make_unique<LinuxVM>(sm.get());
 		std::cout << "Successfully initiated VMI on " << argv[1] << "!" << std::endl;
 
@@ -86,7 +91,8 @@ int main(int argc, char** argv)
 		if (!sm->GetInjectionStrategy()->Apply(patch))
 			throw std::runtime_error("Failed to apply patch!");
 
-		system("read");
+		std::cout << "Applied patch, press any key to undo it!" << std::endl;
+		std::cin.get();
 		if (!sm->GetInjectionStrategy()->Undo(patch))
 			throw std::runtime_error("Failed to undo patch!");
 		
