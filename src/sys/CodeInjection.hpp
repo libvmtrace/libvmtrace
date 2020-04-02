@@ -7,10 +7,15 @@
 #include <memory>
 #include <climits>
 #include <libvmi/libvmi.h>
+#include <sys/Xen.hpp>
 
 namespace libvmtrace
 {
 	inline static constexpr auto ALL_VCPU = ULONG_MAX;
+	inline static constexpr auto PAGE_RANGE = 12; // (1 << 12) = 4096
+
+	inline addr_t addr_to_page(addr_t addr) { return addr >> PAGE_RANGE; }
+	inline addr_t page_to_addr(addr_t page) { return page << PAGE_RANGE; }
 
 	class SystemMonitor;
 
@@ -18,6 +23,7 @@ namespace libvmtrace
 	{
 		friend class InjectionStrategy;
 		friend class PrimitiveInjectionStrategy;
+		friend class ExtendedInjectionStrategy;
 
 	public:
 		Patch(addr_t location, uint64_t pid, uint64_t vcpu, std::vector<uint8_t> data)
@@ -30,6 +36,12 @@ namespace libvmtrace
 		std::vector<uint8_t> data;
 		std::vector<uint8_t> original;
 		std::vector<std::shared_ptr<Patch>> dependencies;
+	};
+
+	struct ShadowPage
+	{
+		addr_t read_write{}, execute{};
+		size_t refs{};
 	};
 
 	class InjectionStrategy
@@ -88,8 +100,25 @@ namespace libvmtrace
 	public:
 		PrimitiveInjectionStrategy(std::shared_ptr<SystemMonitor> sm);
 		virtual bool Apply(std::shared_ptr<Patch> patch) override;
+	
 	private:
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
+	};
+	
+	class ExtendedInjectionStrategy : public InjectionStrategy
+	{
+	public:
+		ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm);
+		virtual bool Apply(std::shared_ptr<Patch> patch) override;
+	
+	private:
+		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
+	
+		ShadowPage ReferenceShadowPage(addr_t page);
+		void UnreferenceShadowPage(addr_t page);
+
+		std::vector<ShadowPage> shadow_pages;
+		std::shared_ptr<Xen> xen;
 	};
 }
 

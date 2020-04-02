@@ -19,7 +19,8 @@ set (sys_files
 	sys/LinuxELFInjector.cpp
 	sys/LinuxFileExtractor.cpp
 	sys/DwarfHelper.cpp
-	sys/PrimitiveInjectionStrategy.cpp)
+	sys/PrimitiveInjectionStrategy.cpp
+	sys/ExtendedInjectionStrategy.cpp)
 
 set (util_files
 	util/utils.cpp
