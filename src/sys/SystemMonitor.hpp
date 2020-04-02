@@ -115,6 +115,11 @@ namespace libvmtrace
 				}
 			}
 
+			std::shared_ptr<InjectionStrategy> GetInjectionStrategy()
+			{
+				return _inj;
+			}
+
 		private:
 			const std::string _name;
 			bool _initialized;

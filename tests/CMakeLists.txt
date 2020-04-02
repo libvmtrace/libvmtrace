@@ -12,6 +12,7 @@ set (test_files
 	static_elasticsearch_test.cpp
 	static_test_agent_presence.cpp
 	static_test_file_extraction.cpp
+	static_test_simple_injection.cpp
 	memory_test.cpp)
 
 foreach (test_file ${test_files})
