@@ -101,7 +101,7 @@ namespace libvmtrace
 				result |= !UndoPatch(next);
 			}
 			
-			return !result && UndoPatch(patch);
+			return !result & UndoPatch(patch);
 		}
 
 	protected:
