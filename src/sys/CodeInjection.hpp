@@ -92,12 +92,16 @@ namespace libvmtrace
 
 		virtual bool Undo(std::shared_ptr<Patch> patch)
 		{
-			auto result = UndoPatch(patch);
+			auto result = false;
 
-			for (auto& dep : patch->dependencies)
-				result |= UndoPatch(dep);
-
-			return result;
+			while (!patch->dependencies.empty())
+			{
+				const auto next = patch->dependencies.back();
+				patch->dependencies.pop_back();	
+				result |= !UndoPatch(next);
+			}
+			
+			return !result && UndoPatch(patch);
 		}
 
 	protected:
