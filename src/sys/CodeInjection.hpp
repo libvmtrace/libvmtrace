@@ -32,7 +32,7 @@ namespace libvmtrace
 	inline addr_t page_to_addr(addr_t page) { return page << PAGE_RANGE; }
 	inline addr_t translate_page_offset(addr_t from, addr_t to)
 	{
-		return to + from & (PAGE_SIZE - 1);
+		return to + (from & (PAGE_SIZE - 1));
 	}
 
 	class SystemMonitor;

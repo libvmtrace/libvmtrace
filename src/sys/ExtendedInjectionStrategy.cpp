@@ -100,15 +100,15 @@ namespace libvmtrace
 		// figure out where to place our patch within the shadow page.
 		const auto shadow_page = ReferenceShadowPage(start_page);
 		const auto offset = translate_page_offset(patch->location, page_to_addr(shadow_page.execute));
-
+		
 		// store off original shadow page contents.
 		patch->original.resize(patch->data.size());
 		if (vmi_read_pa(guard.get(), offset, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
 			return false;
-	
+
 		// finally, we can make our changes to our shadow page.
 		if (vmi_write_pa(guard.get(), offset, patch->data.size(), patch->data.data(), nullptr) != VMI_SUCCESS)
-			return false;
+			return false;		
 
 		return InjectionStrategy::Apply(patch);
 	}
@@ -118,7 +118,7 @@ namespace libvmtrace
 		LockGuard guard(sm);
 
 		const auto shadow_page = UnreferenceShadowPage(addr_to_page(patch->location));
-		
+
 		// if the unreferenced shadow page still has references elsewhere, we need to undo our changes.
 		if (shadow_page.execute)
 		{
@@ -243,6 +243,10 @@ namespace libvmtrace
 		// make enough room.
 		init_mem = xen->GetMaxMem();
 		xen->SetMaxMem(~0);
+
+		// TODO: dirty hack, remove the sanity check for physical addresses.
+		// this wasn't meant to be accessed by us. too bad!
+		*reinterpret_cast<addr_t*>(uintptr_t(guard.get()) + 0x200) = ~0ull;
 
 		// close xenctrl interface.
 		xc_interface_close(xc);
