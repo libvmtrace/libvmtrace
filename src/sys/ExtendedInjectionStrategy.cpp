@@ -54,9 +54,9 @@ namespace libvmtrace
 		// never initialized...
 		if (!xen)
 			return;
-
+		
 		LockGuard guard(sm);
-
+		
 		// remove event handler.
 		vmi_clear_event(guard.get(), &mem_event, nullptr);
 
@@ -67,6 +67,9 @@ namespace libvmtrace
 
 		// free our sink page.
 		FreePage(sink_page);
+
+		// reset memory.
+		xen->SetMaxMem(init_mem);
 	}
 
 	bool ExtendedInjectionStrategy::Apply(std::shared_ptr<Patch> patch)
@@ -140,7 +143,7 @@ namespace libvmtrace
 
 		// TODO: check if this is the right process and the right vcpu calling us.
 
-		std::cout << "Invoked mem event handler!\n";
+		//std::cout << "Invoked mem event handler!\n";
 		return 0;
 	}
 
@@ -203,8 +206,6 @@ namespace libvmtrace
 
 	uint64_t ExtendedInjectionStrategy::AllocatePage()
 	{
-		AdjustMemoryCapacity(PAGE_SIZE); 	
-
 		auto new_page = ++last_page;
 		if (xen->CreateNewPage(&new_page) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to allocate new page.");
@@ -215,17 +216,9 @@ namespace libvmtrace
 	{	
 		if (xen->DestroyPage(&page) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to free page.");
-		
-		AdjustMemoryCapacity(-PAGE_SIZE); 	
 	}
 
-	void ExtendedInjectionStrategy::AdjustMemoryCapacity(int64_t delta)
-	{
-		const auto current = xen->GetMaxMem();
-		xen->SetMaxMem(current + delta);
-	}
-
-	void ExtendedInjectionStrategy::EnableAltp2m() const
+	void ExtendedInjectionStrategy::EnableAltp2m()
 	{
 		LockGuard guard(sm);
 		const auto vmi_id = vmi_get_vmid(guard.get());
@@ -246,6 +239,10 @@ namespace libvmtrace
 		// set default domain state.
 		if (xc_altp2m_set_domain_state(xc, vmi_id, 1) < 0)
 			throw std::runtime_error("Failed to get altp2m domain state.");
+
+		// make enough room.
+		init_mem = xen->GetMaxMem();
+		xen->SetMaxMem(~0);
 
 		// close xenctrl interface.
 		xc_interface_close(xc);

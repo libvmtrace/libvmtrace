@@ -28,7 +28,7 @@ include_directories (${GLIB_INCLUDE_DIR}
 include (ExternalProject)
 ExternalProject_Add(libvmi
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi
-	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>)
+	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DENABLE_KVM=OFF) #-DVMI_DEBUG=__VMI_DEBUG_ALL)
 set (libdwarfparser_flags "-I${CMAKE_CURRENT_SOURCE_DIR}/contrib/libvmi -DLIBVMI_EXTRA_GLIB -DENABLE_KVM=OFF")
 ExternalProject_Add(libdwarfparser
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libdwarfparser

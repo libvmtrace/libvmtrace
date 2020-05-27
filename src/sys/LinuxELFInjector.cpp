@@ -159,38 +159,6 @@ namespace libvmtrace
 		return true;
 	}
 
-	bool LinuxELFInjector::on_mmap_break(const Event* event, void* data)
-	{
-		assert(forked);
-
-		// access the event data.
-		LockGuard guard(sm);
-		const auto bp_event = reinterpret_cast<const BPEventData* const>(data);
-
-		// make sure we are at the break point.
-		if (!bp_event->beforeSingleStep || bp_event->paddr != mmap)
-			return false;
-
-		// write executable to shared memory mapped region.
-		if (vmi_write_va(guard.get(), bp_event->regs.r13, child->GetPid(),
-				executable->size(), executable->data(), nullptr) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to write executable to memory.");
-
-		// step over the breakpoint and execute memory.
-		if (vmi_set_vcpureg(guard.get(), bp_event->regs.rip + 1, RIP,
-				bp_event->vcpu) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to step over breakpoint.");
-
-		// set marker that image was sent to the guest.
-		mapped = true;
-
-		// attach syscall breakpoint.
-		execveat_call = std::make_unique<SyscallEvent>(offsets.execveat_index,
-				*execveat_listener, false, false, false);
-		vm->RegisterSyscall(*execveat_call);
-		return true;
-	}
-	
 	void debug_cpu(vmi_instance_t vmi, vmi_pid_t pid, const BPEventData* data)
 	{
 		char test[200];
@@ -213,7 +181,39 @@ namespace libvmtrace
 			<< "R12: 0x" << std::hex << data->regs.r12 << std::endl
 			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
 	}
-	
+
+	bool LinuxELFInjector::on_mmap_break(const Event* event, void* data)
+	{
+		assert(forked);
+
+		// access the event data.
+		LockGuard guard(sm);
+		const auto bp_event = reinterpret_cast<const BPEventData* const>(data);
+
+		// make sure we are at the break point.
+		if (!bp_event->beforeSingleStep || bp_event->paddr != mmap)
+			return false;
+		
+		// write executable to shared memory mapped region.
+		if (vmi_write_va(guard.get(), bp_event->regs.r13, child->GetPid(),
+				executable->size(), executable->data(), nullptr) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to write executable to memory.");
+
+		// step over the breakpoint and execute memory.
+		if (vmi_set_vcpureg(guard.get(), bp_event->regs.rip + 1, RIP,
+				bp_event->vcpu) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to step over breakpoint.");
+
+		// set marker that image was sent to the guest.
+		mapped = true;
+
+		// attach syscall breakpoint.
+		execveat_call = std::make_unique<SyscallEvent>(offsets.execveat_index,
+				*execveat_listener, false, false, false);
+		vm->RegisterSyscall(*execveat_call);
+		return true;
+	}
+		
 	bool LinuxELFInjector::on_last_chance(const Event* event, void* data)
 	{
 		LockGuard guard(sm);

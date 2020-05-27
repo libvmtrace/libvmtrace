@@ -80,6 +80,13 @@ namespace libvmtrace
 				}
 				else
 				{
+					if (ept_support)
+						_inj = std::make_shared<ExtendedInjectionStrategy>(
+								std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
+					else
+						_inj = std::make_shared<PrimitiveInjectionStrategy>(
+								std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
+
 					_initialized = true;
 					return VMI_SUCCESS;
 				}
@@ -98,6 +105,7 @@ namespace libvmtrace
 
 	void SystemMonitor::DeInit()
 	{
+		_inj = nullptr;
 		//vmi_destroy(_vmi);
 	}
 

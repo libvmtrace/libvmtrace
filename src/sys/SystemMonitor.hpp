@@ -28,15 +28,7 @@ namespace libvmtrace
 		public:
 			SystemMonitor(const std::string name, const bool event_support, const bool ept_support = false) :
 				_name(name), _initialized(false), _event_support(event_support), _bpm(nullptr),
-				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0)
-			{
-				if (ept_support)
-					_inj = std::make_shared<ExtendedInjectionStrategy>(
-							std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
-				else
-					_inj = std::make_shared<PrimitiveInjectionStrategy>(
-							std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
-			}
+				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0), ept_support(ept_support) { }
 
 			~SystemMonitor();
 
@@ -130,6 +122,7 @@ namespace libvmtrace
 			const std::string _name;
 			bool _initialized;
 			bool _event_support;
+			bool ept_support;
 			
 			vmi_instance_t _vmi;
 			std::recursive_mutex _vmi_mtx;   

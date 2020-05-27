@@ -1687,7 +1687,9 @@ namespace libvmtrace
 		// prepare extraction agent and setup communication.
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);
+		auto start = std::chrono::high_resolution_clock::now();
 		const auto child = InjectELF(p, agent);
+		auto end = std::chrono::high_resolution_clock::now();
 		LinuxFileExtractor extractor(sm, vm, child, agent);
 
 		// request the file and dump it onto local filesystem.
@@ -1695,6 +1697,8 @@ namespace libvmtrace
 		extractor.open_file(out);
 		while (!extractor.read_chunk()) { /* nothing */ }
 		extractor.close_file();
+		std::chrono::duration<double, std::milli> t(end-start);
+		std::cout << "Time: " << t.count() << " ms" << std::endl;
 	}
 	
 	std::vector<uint8_t> LinuxVM::ExtractFile(const Process& p, const std::string file)
@@ -1759,6 +1763,8 @@ namespace libvmtrace
 				it = _code_injections.erase(it);
 			}
 		}
+
+		_sm->DeInit();
 
 		if(_sm->GetBPM() != nullptr)
 		{

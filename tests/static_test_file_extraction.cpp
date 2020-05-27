@@ -1,9 +1,12 @@
 
 #include <libvmtrace.hpp>
 #include <sys/LinuxVM.hpp>
+#include <sys/LinuxFileExtractor.hpp>
 #include <optional>
+#include <chrono>
 
 using namespace libvmtrace;
+using namespace libvmtrace::file_extraction;
 
 // vmtrace wrapper.
 std::shared_ptr<SystemMonitor> sm;
@@ -82,13 +85,12 @@ int main(int argc, char** argv)
 		if (!process.has_value())
 			throw std::runtime_error("Failed to retrieve suitable process from VM.");
 
-		std::cout << "Select target file: ";
-		std::string selection;
-		std::cin >> selection;
+
+		//std::cout << "Select target file: ";
+		std::string selection = "/home/guest/files/small";
+		//std::cin >> selection;
 		
 		vm->ExtractFile(*process, selection, "./file");
-		std::cout << "File successfully extracted." << std::endl;
-
 	}
 	catch (const std::exception& e)
 	{

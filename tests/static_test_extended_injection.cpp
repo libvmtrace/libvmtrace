@@ -76,6 +76,7 @@ int main(int argc, char** argv)
 	{
 		sm->Init();
 		//bpm->Init();
+		sm->Loop();
 		vm = std::make_unique<LinuxVM>(sm.get());
 		std::cout << "Successfully initiated VMI on " << argv[1] << "!" << std::endl;
 

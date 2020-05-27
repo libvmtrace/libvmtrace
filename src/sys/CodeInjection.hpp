@@ -145,12 +145,11 @@ namespace libvmtrace
 
 		uint64_t AllocatePage();
 		void FreePage(uint64_t page);
-		void AdjustMemoryCapacity(int64_t delta);
-		void EnableAltp2m() const;
+		void EnableAltp2m();
 
 		std::vector<ShadowPage> shadow_pages;
 		std::shared_ptr<Xen> xen;
-		uint64_t last_page, sink_page;
+		uint64_t init_mem, last_page, sink_page;
 		uint16_t view_rw, view_x;
 		vmi_event_t mem_event;
 	};
