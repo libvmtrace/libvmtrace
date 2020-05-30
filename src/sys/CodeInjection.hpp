@@ -129,6 +129,8 @@ namespace libvmtrace
 	
 	class ExtendedInjectionStrategy : public InjectionStrategy
 	{
+		inline static constexpr auto max_vcpu = 16;
+
 	public:
 		ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm);
 		virtual ~ExtendedInjectionStrategy() override;
@@ -139,6 +141,7 @@ namespace libvmtrace
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
 
 		static event_response_t HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event);
+		static event_response_t HandleStepEvent(vmi_instance_t vmi, vmi_event_t* event);
 
 		ShadowPage ReferenceShadowPage(addr_t page);
 		ShadowPage UnreferenceShadowPage(addr_t page);
@@ -152,6 +155,7 @@ namespace libvmtrace
 		uint64_t init_mem, last_page, sink_page;
 		uint16_t view_rw, view_x;
 		vmi_event_t mem_event;
+		vmi_event_t step_events[16];
 	};
 }
 

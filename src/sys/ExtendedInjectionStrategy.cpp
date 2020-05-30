@@ -31,6 +31,10 @@ namespace libvmtrace
 		if (vmi_write_pa(guard.get(), page_to_addr(sink_page), sizeof(mask), &mask, nullptr) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to mask sink page.");
 
+		// switch domain state.
+		if (vmi_slat_set_domain_state(guard.get(), true) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to switch domain state.");
+
 		// create read / write view.
 		if (vmi_slat_create(guard.get(), &view_rw) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to create r/w view.");
@@ -43,6 +47,15 @@ namespace libvmtrace
 		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RW, HandleMemEvent, 1);
 		mem_event.data = this;
 		vmi_register_event(guard.get(), &mem_event);
+
+		// setup single step events.
+		for (auto i = 0; i < max_vcpu; i++)
+		{
+			auto& event = step_events[i];
+			SETUP_SINGLESTEP_EVENT(&event, 1 << i, HandleStepEvent, 0);
+			event.data = this;
+			vmi_register_event(guard.get(), &event);
+		}
 
 		// make execute view active.
 		if (vmi_slat_switch(guard.get(), view_x) != VMI_SUCCESS)
@@ -59,11 +72,14 @@ namespace libvmtrace
 		
 		// remove event handler.
 		vmi_clear_event(guard.get(), &mem_event, nullptr);
-
+		for (auto i = 0; i < max_vcpu; i++)
+			vmi_clear_event(guard.get(), &step_events[i], nullptr);
+		
 		// remove all custom views.
 		vmi_slat_switch(guard.get(), 0);
 		vmi_slat_destroy(guard.get(), view_rw);
 		vmi_slat_destroy(guard.get(), view_x);
+		vmi_slat_set_domain_state(guard.get(), false);
 
 		// free our sink page.
 		FreePage(sink_page);
@@ -95,12 +111,12 @@ namespace libvmtrace
 		const auto start_page = addr_to_page(patch->location);
 		const auto end_page = addr_to_page(patch->location + patch->data.size());
 		if (start_page != end_page)
-			throw std::runtime_error("EPT patch cannot modify multiple pages.");
+			throw std::runtime_error("EPT patch cannot modify multiple pages for now.");
 
 		// figure out where to place our patch within the shadow page.
 		const auto shadow_page = ReferenceShadowPage(start_page);
 		const auto offset = translate_page_offset(patch->location, page_to_addr(shadow_page.execute));
-		
+	
 		// store off original shadow page contents.
 		patch->original.resize(patch->data.size());
 		if (vmi_read_pa(guard.get(), offset, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
@@ -135,16 +151,28 @@ namespace libvmtrace
 	{
 		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
 
+		// TODO: check if this is the right process and the right vcpu calling us.
+		
 		if (event->mem_event.gfn == instance->sink_page)
 		{
 			std::cout << "Someone tried to access the sink page." << std::endl;
 			return VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
 		}
 
-		// TODO: check if this is the right process and the right vcpu calling us.
+		event->slat_id = instance->view_rw;
 
-		//std::cout << "Invoked mem event handler!\n";
-		return 0;
+		return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+	}
+
+	event_response_t ExtendedInjectionStrategy::HandleStepEvent(vmi_instance_t vmi, vmi_event* event)
+	{
+		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
+	
+		// TODO: check if this is the right process and the right vcpu calling us.
+		
+		event->slat_id = instance->view_x;
+
+		return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 	}
 
 	ShadowPage ExtendedInjectionStrategy::ReferenceShadowPage(addr_t page)
@@ -196,6 +224,8 @@ namespace libvmtrace
 		// did we just lose the last reference to this page?
 		if (--shadow_page->refs == 0)
 		{
+			// TODO: unmap it from the slat...
+
 			FreePage(shadow_page->execute);
 			shadow_pages.erase(shadow_page);
 			return {};
@@ -206,16 +236,27 @@ namespace libvmtrace
 
 	uint64_t ExtendedInjectionStrategy::AllocatePage()
 	{
+		LockGuard guard(sm);
+		
 		auto new_page = ++last_page;
 		if (xen->CreateNewPage(&new_page) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to allocate new page.");
+		
+		// refresh the cached end of physical memory.
+		vmi_get_max_physical_address(guard.get());
+		
 		return new_page;
 	}
 
 	void ExtendedInjectionStrategy::FreePage(uint64_t page)
 	{	
+		LockGuard guard(sm);
+		
 		if (xen->DestroyPage(&page) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to free page.");
+		
+		// refresh the cached end of physical memory.
+		vmi_get_max_physical_address(guard.get());
 	}
 
 	void ExtendedInjectionStrategy::EnableAltp2m()
@@ -246,7 +287,7 @@ namespace libvmtrace
 
 		// TODO: dirty hack, remove the sanity check for physical addresses.
 		// this wasn't meant to be accessed by us. too bad!
-		*reinterpret_cast<addr_t*>(uintptr_t(guard.get()) + 0x200) = ~0ull;
+		//*reinterpret_cast<addr_t*>(uintptr_t(guard.get()) + 0x200) = ~0ull;
 
 		// close xenctrl interface.
 		xc_interface_close(xc);
