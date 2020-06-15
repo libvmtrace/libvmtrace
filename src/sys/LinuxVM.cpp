@@ -938,29 +938,8 @@ namespace libvmtrace
 
 	addr_t LinuxVM::GetSymbolAddrVa(const uint8_t* binary, const Process& p, const std::string path, const std::string symbolName, const bool onlyFunctions)
 	{
-		addr_t va = 0;
-		int len = 0;
-
-		const auto offset = _eh->elf_get_symbol_addr(const_cast<uint8_t*>(binary),
+		return  _eh->elf_get_symbol_addr(const_cast<uint8_t*>(binary),
 				".symtab", symbolName.c_str(), onlyFunctions);
-		
-		return offset;
-		const auto maps = GetMMaps(p);
-
-		for (const auto& entry : maps)
-		{
-			if (onlyFunctions && !(entry.flags & 0x4))
-				continue;
-
-			if (entry.path.find(path) != string::npos)
-			{
-				va = entry.start + offset;
-				break;
-			}
-		
-		}
-		
-		return va;
 	}
 
 	bool LinuxVM::ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi)
