@@ -912,7 +912,7 @@ namespace libvmtrace
 				break;
 			}
 		}
-		
+	
 		return va;
 	}
 
@@ -943,6 +943,8 @@ namespace libvmtrace
 
 		const auto offset = _eh->elf_get_symbol_addr(const_cast<uint8_t*>(binary),
 				".symtab", symbolName.c_str(), onlyFunctions);
+		
+		return offset;
 		const auto maps = GetMMaps(p);
 
 		for (const auto& entry : maps)
@@ -955,6 +957,7 @@ namespace libvmtrace
 				va = entry.start + offset;
 				break;
 			}
+		
 		}
 		
 		return va;

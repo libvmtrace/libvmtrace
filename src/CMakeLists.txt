@@ -46,7 +46,7 @@ set_source_files_properties (${agent} PROPERTIES EXTERNAL_OBJECT true GENERATED 
 
 add_executable (linux_file_extraction_agent agent/LinuxFileExtractionAgent.cpp)
 set_property (TARGET linux_file_extraction_agent PROPERTY LINK_LIBRARIES "")
-target_link_libraries (linux_file_extraction_agent PRIVATE pthread rt -static-libgcc -static-libstdc++)
+target_link_libraries (linux_file_extraction_agent PRIVATE pthread rt -static)
 
 add_custom_command(TARGET linux_file_extraction_agent
 	POST_BUILD

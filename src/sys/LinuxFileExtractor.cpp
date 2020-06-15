@@ -104,6 +104,7 @@ namespace file_extraction
 
 		// notify in-guest agent about selection.
 		set_flag(file_extraction::status::file_selected);
+		
 	}
 
 	// core logic for transmitting a file, reads one memory mapped chunk of the file.
