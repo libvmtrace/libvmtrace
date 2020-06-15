@@ -169,8 +169,9 @@ namespace libvmtrace
 		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
 	
 		// TODO: check if this is the right process and the right vcpu calling us.
-		
-		event->slat_id = instance->view_x;
+
+		if (event->vcpu_id == 0)	
+			event->slat_id = instance->view_x;
 
 		return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 	}
@@ -284,10 +285,6 @@ namespace libvmtrace
 		// make enough room.
 		init_mem = xen->GetMaxMem();
 		xen->SetMaxMem(~0);
-
-		// TODO: dirty hack, remove the sanity check for physical addresses.
-		// this wasn't meant to be accessed by us. too bad!
-		//*reinterpret_cast<addr_t*>(uintptr_t(guard.get()) + 0x200) = ~0ull;
 
 		// close xenctrl interface.
 		xc_interface_close(xc);
