@@ -138,9 +138,10 @@ namespace libvmtrace
 	public:
 		LinuxVM(SystemMonitor* sm);
 
+        	Process GetCurrentProcess(addr_t current_process) const;
 		std::vector<Process> GetProcessList();
 		std::vector<net::NetworkConnection> GetNetworkConnections(const Process& p, const ConnectionType type);
-		std::vector<OpenFile> GetOpenFiles(const Process& p);
+		std::vector<OpenFile> GetOpenFiles(const Process& p, int filterfd = -1) const;
 		std::vector<vm_area> GetMMaps(const Process& p);
 
 		status_t RegisterSyscall(SyscallEvent& ev);
@@ -186,8 +187,9 @@ namespace libvmtrace
 		addr_t _thread_struct_offset, _sp_offset, _sp0_offset, _sp_on_pt_regs_offset, _ip_on_pt_regs_offset, _current_task_offset;
 		addr_t _socket_type_offset, _socket_family;
 
-		std::string d_path(addr_t path, vmi_instance_t vmi);
-		uint32_t create_path(addr_t dentry, char* buf, vmi_instance_t vmi);
+		std::string d_path(addr_t path, vmi_instance_t vmi) const;
+		uint32_t create_path(addr_t dentry, char* buf, vmi_instance_t vmi) const;
+		Process taskstruct_to_Process(addr_t current_process, vmi_instance_t vmi) const;
 
 		addr_t GetSyscallAddrVA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
 		addr_t GetSyscallAddrPA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);
