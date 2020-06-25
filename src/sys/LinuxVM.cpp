@@ -102,17 +102,79 @@ namespace libvmtrace
 		sm->Unlock();
 	}
 
-	vector<Process> LinuxVM::GetProcessList(void)
+	Process LinuxVM::GetCurrentProcess(addr_t gs_base) const
 	{
-		vector<Process> processes;
+		vmi_instance_t vmi = _sm->Lock();
 
-		addr_t list_head = 0, next_list_entry = 0;
-		addr_t current_process = 0;
+                addr_t current_process;
+		addr_t cpptr = gs_base + _current_task_offset;
+                vmi_read_addr_va(vmi, cpptr, 0, &current_process);
+
+		Process p = taskstruct_to_Process(current_process, vmi);
+                _sm->Unlock();
+		return p;
+	}
+
+	Process LinuxVM::taskstruct_to_Process(addr_t current_process, vmi_instance_t vmi) const
+	{
 		status_t status;
 		vmi_pid_t pid = 0;
 		addr_t dtb = 0;
 		vmi_pid_t parent_pid = 0;
 		int uid = 0;
+
+		status = vmi_read_32_va(vmi, current_process + _tgid_offset, 0, (uint32_t*)&pid);
+		if(status == VMI_FAILURE)
+		{
+			throw std::runtime_error("VMI failure when reading PID");
+		}
+
+		addr_t tmp2;
+		vmi_read_addr_va(vmi, current_process + _parent_offset, 0, &tmp2);
+		vmi_read_32_va(vmi, tmp2 + _tgid_offset, 0, (uint32_t*)&parent_pid);
+
+		addr_t tmp3;
+		vmi_read_addr_va(vmi, current_process + _real_cred_offset, 0, &tmp3);
+		vmi_read_32_va(vmi, tmp3 + _uid_offset, 0, (uint32_t*)&uid);
+
+		char* procname = vmi_read_str_va(vmi, current_process + _name_offset, 0);
+		string name = "";
+		if(procname)
+		{
+			name = string(procname);
+			free(procname);
+			procname = NULL;
+		}
+
+		//vmi_pid_to_dtb(vmi, pid, &dtb);
+
+		addr_t mm;
+		vmi_read_addr_va(vmi, current_process + _mm_offset, 0, &mm);
+		addr_t pgd;
+		vmi_read_addr_va(vmi, mm + _pgd_offset, 0, &pgd);
+
+		vmi_translate_kv2p(vmi, pgd, &dtb);
+
+		// cout << dec << pid << " : " << parent_pid << " - " << name << endl;
+
+		addr_t tmp4;
+		vmi_read_addr_va(vmi, current_process + _fs_offset, 0, &tmp4);
+		string pwd = d_path(tmp4 + _pwd_offset, vmi);
+
+		addr_t tmp5;
+		vmi_read_addr_va(vmi, mm+_exe_file_offset, 0, &tmp5);
+		string path = d_path(tmp5 + _f_path_offset, vmi);
+		Process p(current_process, pid, dtb, name, path, parent_pid, uid, pwd);
+		return p;
+	}
+
+	vector<Process> LinuxVM::GetProcessList(void)
+	{
+		vector<Process> processes;
+		status_t status;
+
+		addr_t list_head = 0, next_list_entry = 0;
+		addr_t current_process = 0;
 
 		vmi_instance_t vmi = _sm->Lock();
 
@@ -127,50 +189,12 @@ namespace libvmtrace
 		do
 		{
 			current_process = next_list_entry - _tasks_offset;
-			status = vmi_read_32_va(vmi, current_process + _tgid_offset, 0, (uint32_t*)&pid);
-			if(status == VMI_FAILURE)
-			{
+			try {
+				Process p = taskstruct_to_Process(current_process, vmi);
+				processes.push_back(p);
+			} catch(std::runtime_error &e) {
 				break;
-			}
-
-			addr_t tmp2;
-			vmi_read_addr_va(vmi, current_process + _parent_offset, 0, &tmp2);
-			vmi_read_32_va(vmi, tmp2 + _tgid_offset, 0, (uint32_t*)&parent_pid);
-
-			addr_t tmp3;
-			vmi_read_addr_va(vmi, current_process + _real_cred_offset, 0, &tmp3);
-			vmi_read_32_va(vmi, tmp3 + _uid_offset, 0, (uint32_t*)&uid);
-
-			char* procname = vmi_read_str_va(vmi, current_process + _name_offset, 0);
-			string name = "";
-			if(procname)
-			{
-				name = string(procname);
-				free(procname);
-				procname = NULL;
-			}
-
-			//vmi_pid_to_dtb(vmi, pid, &dtb);
-
-			addr_t mm;
-			vmi_read_addr_va(vmi, current_process + _mm_offset, 0, &mm);
-			addr_t pgd;
-			vmi_read_addr_va(vmi, mm + _pgd_offset, 0, &pgd);
-
-			vmi_translate_kv2p(vmi, pgd, &dtb);
-
-			// cout << dec << pid << " : " << parent_pid << " - " << name << endl;
-
-			addr_t tmp4;
-			vmi_read_addr_va(vmi, current_process + _fs_offset, 0, &tmp4);
-			string pwd = d_path(tmp4 + _pwd_offset, vmi);
-
-			addr_t tmp5;
-			vmi_read_addr_va(vmi, mm+_exe_file_offset, 0, &tmp5);
-			string path = d_path(tmp5 + _f_path_offset, vmi);
-
-			Process p(current_process, pid, dtb, name, path, parent_pid, uid, pwd);
-			processes.push_back(p);
+			}				
 
 			status = vmi_read_addr_va(vmi, next_list_entry, 0, &next_list_entry);
 			if(status == VMI_FAILURE)
@@ -356,7 +380,7 @@ namespace libvmtrace
 		return networkconnections;
 	}
 
-	vector <OpenFile> LinuxVM::GetOpenFiles(const Process& p)
+	vector <OpenFile> LinuxVM::GetOpenFiles(const Process& p, int filterfd) const
 	{
 		vector<OpenFile> openfiles;
 
@@ -366,7 +390,7 @@ namespace libvmtrace
 		addr_t files = 0;
 		vmi_read_64_va(vmi, p.GetTaskStruct() + _files_offset, 0, &files);
 
-		// http://lxr.free-electrons.com/source/include/linux/fdtable.h?v=3.16#L24
+		// https://elixir.bootlin.com/linux/v4.20/source/include/linux/fdtable.h#L27
 		addr_t fdt = 0;
 		vmi_read_64_va(vmi, files + _fdt_offset, 0, &fdt);
 		vmi_read_32_va(vmi, fdt + 0, 0, &max_fds);
@@ -375,6 +399,13 @@ namespace libvmtrace
 		vmi_read_64_va(vmi, fdt + _fd_offset, 0, &fd);
 
 		// int count = 0;
+		int minfd = 3;
+		if( filterfd >= 0 ) {  // if filterfd is specified, return only this file (if fd exists)
+			minfd = filterfd; 
+			max_fds = std::min(minfd+1, (int)max_fds);
+		}
+		std::cout << "minfd: " << minfd << ", maxfd: " << max_fds << "\n";
+		
 		for(uint32_t it = 3; it < max_fds ; it++)
 		{
 			addr_t file = 0;
@@ -408,13 +439,11 @@ namespace libvmtrace
 				default:
 					break;
 			}
-
 			OpenFile f;
 			f.path = path;
 			f.fd = it;
 			f.mode = mode;
 			f.write = write;
-
 			openfiles.push_back(f);
 		}
 
@@ -423,7 +452,7 @@ namespace libvmtrace
 		return openfiles;
 	}
 
-	string LinuxVM::d_path(addr_t path, vmi_instance_t vmi) 
+	string LinuxVM::d_path(addr_t path, vmi_instance_t vmi) const
 	{
 		// struct_path : http://lxr.free-electrons.com/source/include/linux/path.h#L7
 		addr_t mnt;
@@ -449,7 +478,7 @@ namespace libvmtrace
 		return string(buf);
 	}
 
-	uint32_t LinuxVM::create_path(addr_t dentry, char* buf, vmi_instance_t vmi) 
+	uint32_t LinuxVM::create_path(addr_t dentry, char* buf, vmi_instance_t vmi) const
 	{
 		addr_t name;
 		char* tmp;
