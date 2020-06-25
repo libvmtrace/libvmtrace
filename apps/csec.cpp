@@ -45,10 +45,10 @@ int main(int argc, char* argv[])
 	SystemMonitor sm(vm_id, true);
 	_sm = &sm;
 
-	Altp2mBasic* altp2mbasic = new Altp2mBasic(sm);
-	sm.SetBPM(altp2mbasic, altp2mbasic->GetType());
+	Int3 *int3 = new Int3(sm);
+	sm.SetBPM(int3, int3->GetType());
 	sm.Init();
-	altp2mbasic->Init();
+	int3->Init();
 	sm.Loop();
 
 	LinuxVM linux(&sm);
