@@ -912,7 +912,7 @@ namespace libvmtrace
 				break;
 			}
 		}
-		
+	
 		return va;
 	}
 
@@ -938,26 +938,8 @@ namespace libvmtrace
 
 	addr_t LinuxVM::GetSymbolAddrVa(const uint8_t* binary, const Process& p, const std::string path, const std::string symbolName, const bool onlyFunctions)
 	{
-		addr_t va = 0;
-		int len = 0;
-
-		const auto offset = _eh->elf_get_symbol_addr(const_cast<uint8_t*>(binary),
+		return  _eh->elf_get_symbol_addr(const_cast<uint8_t*>(binary),
 				".symtab", symbolName.c_str(), onlyFunctions);
-		const auto maps = GetMMaps(p);
-
-		for (const auto& entry : maps)
-		{
-			if (onlyFunctions && !(entry.flags & 0x4))
-				continue;
-
-			if (entry.path.find(path) != string::npos)
-			{
-				va = entry.start + offset;
-				break;
-			}
-		}
-		
-		return va;
 	}
 
 	bool LinuxVM::ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi)
@@ -1687,9 +1669,7 @@ namespace libvmtrace
 		// prepare extraction agent and setup communication.
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);
-		auto start = std::chrono::high_resolution_clock::now();
 		const auto child = InjectELF(p, agent);
-		auto end = std::chrono::high_resolution_clock::now();
 		LinuxFileExtractor extractor(sm, vm, child, agent);
 
 		// request the file and dump it onto local filesystem.
@@ -1697,8 +1677,6 @@ namespace libvmtrace
 		extractor.open_file(out);
 		while (!extractor.read_chunk()) { /* nothing */ }
 		extractor.close_file();
-		std::chrono::duration<double, std::milli> t(end-start);
-		std::cout << "Time: " << t.count() << " ms" << std::endl;
 	}
 	
 	std::vector<uint8_t> LinuxVM::ExtractFile(const Process& p, const std::string file)

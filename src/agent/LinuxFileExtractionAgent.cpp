@@ -4,6 +4,7 @@
 #include <util/Crc32.hpp>
 #include <iostream>
 #include <fstream>
+#include <ext/stdio_filebuf.h>
 #include <thread>
 #include <cassert>
 #include <algorithm>
@@ -55,12 +56,10 @@ bool wait_for_flag(status s, bool value)
 	return 1; \
 }
 
-// read a given file to the transmission buffer, chunk by chunk.
+// read a given stream to the transmission buffer, chunk by chunk.
 // returns true after successful transmission, false otherwise.
-bool read_file_to_buffer(const std::string& path)
+bool read_stream_to_buffer(std::istream&& i)
 {
-	std::ifstream i(path, std::ifstream::binary);
-	
 	if (i.fail())
 		return false;
 
@@ -138,13 +137,18 @@ int main()
 		temporary_file file("/fs_extract_tree");
 
 		// pipe tree to temp file.
-		system(("tree / > " + file.get_mapped_name()).c_str());
-		
+		const auto current = dup(STDOUT_FILENO);
+		dup2(file.get_descriptor(), STDOUT_FILENO);
+		system("tree /");
+		dup2(current, STDOUT_FILENO);
+		lseek(file.get_descriptor(), 0, SEEK_SET);
+
 		// signal file tree transmission.
 		status_guard guard(mem, status::transmitting_file_tree);
 		
 		// finally transmit the file tree in chunks.
-		if (!read_file_to_buffer(file.get_mapped_name()))
+		__gnu_cxx::stdio_filebuf<char> buf(file.get_descriptor(), std::ios::in);
+		if (!read_stream_to_buffer(std::istream(&buf)))
 			FAIL();
 	} 
 
@@ -160,7 +164,7 @@ int main()
 	// read name from the transmission buffer. we assume the written string is null-terminated at this point,
 	// at worst we read till the end of the buffer, get an invalid file name and abort here.
 	std::string target((const char*) mem.buffer, std::min(static_cast<uint32_t>(mem.transmission_size), mem.buffer_size));
-	if (!read_file_to_buffer(target))
+	if (!read_stream_to_buffer(std::ifstream(target, std::ifstream::binary)))
 		FAIL();
 		
 	// assume no error has occured.

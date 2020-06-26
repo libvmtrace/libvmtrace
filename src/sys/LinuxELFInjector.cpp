@@ -149,7 +149,6 @@ namespace libvmtrace
 			throw std::runtime_error("Failed to write executable size.");
 
 		// everything in its place, set up callback for the interrupts the shellcode will trigger.
-		std::cout << "CR3 change occured, placed mmap breakpoint." << std::endl << std::flush;
 		mmap_break = std::make_unique<ProcessBreakpointEvent>("MMAP BP", 0, mmap, *mmap_listener);
 		sm->GetBPM()->InsertBreakpoint(mmap_break.get());
 		last_chance_break = std::make_unique<ProcessBreakpointEvent>("LAST CHANCE BP", 0, last_chance, *last_chance_listener);

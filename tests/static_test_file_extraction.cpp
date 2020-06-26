@@ -84,13 +84,68 @@ int main(int argc, char** argv)
 		const auto process = find_suitable_process(static_cast<vmi_pid_t>(std::stoi(argv[2])));
 		if (!process.has_value())
 			throw std::runtime_error("Failed to retrieve suitable process from VM.");
-
-
-		//std::cout << "Select target file: ";
-		std::string selection = "/home/guest/files/small";
-		//std::cin >> selection;
 		
-		vm->ExtractFile(*process, selection, "./file");
+		// ask the user if we need the full file tree.
+		std::string skip;
+		std::cout << "Skip file tree transmission [y/N]: ";
+		std::cin >> skip;
+		const auto should_skip = !skip.empty() && tolower(skip[0]) == 'y';
+
+		// inject the agent and create extract helper.
+		std::vector<uint8_t> agent;
+		agent.assign(linux_agent_start, linux_agent_end);
+		const auto child = vm->InjectELF(*process, agent);
+		LinuxFileExtractor extractor(sm, vm, child, agent, should_skip);
+		
+		// helper lambda to wrap extraction and status indicator of file download.
+		const auto read_file = [&extractor](const std::string& name)
+		{
+			std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+			extractor.open_file(name);
+			
+			float progress{};
+			while (true)
+			{
+				const auto finished = extractor.read_chunk(&progress);
+				const auto sym = static_cast<int32_t>(progress * 60);
+				const auto lhs = std::string(sym, '=');
+				const auto rhs = std::string(60 - sym, ' ');
+
+				std::cout << "\r" << "File: " << name << " [" << lhs << ">" << rhs << "] "
+					<< std::dec << static_cast<int32_t>(progress * 100.f) << "%";
+
+				if (finished)
+					break;
+			}
+
+			std::cout << std::endl;
+
+			if (!extractor.check_crc())
+				std::cout << "File corrupted, invalid CRC." << std::endl;
+
+			extractor.close_file();
+			std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+			std::cout << "Transmission duration: "
+				<< std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()
+				<< " ms" << std::endl;
+		};
+
+		// read the file system tree from the in-guest agent.
+		if (!should_skip)
+		{
+			read_file("./tree");
+			std::cout << "File tree exchanged, please make your choice." << std::endl;
+		}
+
+		// request file to extract.
+		std::cout << "Select target file: ";
+		std::string selection;
+		std::cin >> selection;
+		extractor.request_file(selection);
+
+		// extract target file.
+		read_file("./file");
+		std::cout << "File successfully extracted." << std::endl;
 	}
 	catch (const std::exception& e)
 	{

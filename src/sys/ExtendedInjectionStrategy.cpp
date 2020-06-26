@@ -17,7 +17,9 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 		xen = std::make_shared<Xen>(vmi_get_vmid(guard.get()));
-	
+		xc = xc_interface_open(0, 0, 0);
+		vmid = vmi_get_vmid(guard.get());
+
 		// enable altp2m support.
 		EnableAltp2m();
 
@@ -39,27 +41,25 @@ namespace libvmtrace
 		if (vmi_slat_create(guard.get(), &view_rw) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to create r/w view.");
 		
-		// create execute view.
-		if (vmi_slat_create(guard.get(), &view_x) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to create x view.");
-
-		// setup memory event.
-		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RW, HandleMemEvent, 1);
-		mem_event.data = this;
-		vmi_register_event(guard.get(), &mem_event);
-
-		// setup single step events.
-		for (auto i = 0; i < max_vcpu; i++)
+		// create and hide execute view.
+		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
 		{
-			auto& event = step_events[i];
-			SETUP_SINGLESTEP_EVENT(&event, 1 << i, HandleStepEvent, 0);
-			event.data = this;
-			vmi_register_event(guard.get(), &event);
+			uint16_t view;
+			if (vmi_slat_create(guard.get(), &view) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to create x view.");
+			if (xc_altp2m_set_visibility(xc, vmid, view, false) < 0)
+				throw std::runtime_error("Could not hide x view.");
+			view_x.push_back(view);
 		}
 
-		// make execute view active.
-		if (vmi_slat_switch(guard.get(), view_x) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to switch to x view.");
+		// setup memory event.
+		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RWX, HandleMemEvent, 1);
+		mem_event.data = this;
+		vmi_register_event(guard.get(), &mem_event);
+		
+		// make r/w view active.
+		if (vmi_slat_switch(guard.get(), view_rw) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to switch to rw view.");
 	}
 
 	ExtendedInjectionStrategy::~ExtendedInjectionStrategy()
@@ -72,17 +72,19 @@ namespace libvmtrace
 		
 		// remove event handler.
 		vmi_clear_event(guard.get(), &mem_event, nullptr);
-		for (auto i = 0; i < max_vcpu; i++)
-			vmi_clear_event(guard.get(), &step_events[i], nullptr);
 		
 		// remove all custom views.
 		vmi_slat_switch(guard.get(), 0);
 		vmi_slat_destroy(guard.get(), view_rw);
-		vmi_slat_destroy(guard.get(), view_x);
+		for (const auto& view : view_x)
+			vmi_slat_destroy(guard.get(), view);
 		vmi_slat_set_domain_state(guard.get(), false);
 
 		// free our sink page.
 		FreePage(sink_page);
+
+		// close xen access handle.
+		xc_interface_close(xc);
 
 		// reset memory.
 		xen->SetMaxMem(init_mem);
@@ -91,7 +93,6 @@ namespace libvmtrace
 	bool ExtendedInjectionStrategy::Apply(std::shared_ptr<Patch> patch)
 	{
 		LockGuard guard(sm);
-		assert(patch->vcpu == ALL_VCPU);
 
 		// lazy initialize.
 		if (!xen)
@@ -114,7 +115,7 @@ namespace libvmtrace
 			throw std::runtime_error("EPT patch cannot modify multiple pages for now.");
 
 		// figure out where to place our patch within the shadow page.
-		const auto shadow_page = ReferenceShadowPage(start_page);
+		const auto shadow_page = ReferenceShadowPage(start_page, patch->vcpu);
 		const auto offset = translate_page_offset(patch->location, page_to_addr(shadow_page.execute));
 	
 		// store off original shadow page contents.
@@ -133,7 +134,7 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 
-		const auto shadow_page = UnreferenceShadowPage(addr_to_page(patch->location));
+		const auto shadow_page = UnreferenceShadowPage(addr_to_page(patch->location), patch->vcpu);
 
 		// if the unreferenced shadow page still has references elsewhere, we need to undo our changes.
 		if (shadow_page.execute)
@@ -151,35 +152,36 @@ namespace libvmtrace
 	{
 		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
 
-		// TODO: check if this is the right process and the right vcpu calling us.
-		
 		if (event->mem_event.gfn == instance->sink_page)
 		{
 			std::cout << "Someone tried to access the sink page." << std::endl;
 			return VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
 		}
+		
+		const auto& target_x = instance->view_x[event->vcpu_id];
 
-		event->slat_id = instance->view_rw;
+		if (event->slat_id == instance->view_rw)
+		{
+			if (xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, true) < 0)
+				throw std::runtime_error("Could not make x view visible.");
+			event->slat_id = target_x;
+			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+		}
+		else if (event->slat_id == target_x)
+		{
+			if (xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, false) < 0)
+				throw std::runtime_error("Could not hide x view.");
+			event->slat_id = instance->view_rw;
+			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+		}
 
-		return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+		return 0;
 	}
 
-	event_response_t ExtendedInjectionStrategy::HandleStepEvent(vmi_instance_t vmi, vmi_event* event)
-	{
-		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
-	
-		// TODO: check if this is the right process and the right vcpu calling us.
-
-		if (event->vcpu_id == 0)	
-			event->slat_id = instance->view_x;
-
-		return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
-	}
-
-	ShadowPage ExtendedInjectionStrategy::ReferenceShadowPage(addr_t page)
+	ShadowPage ExtendedInjectionStrategy::ReferenceShadowPage(addr_t page, uint16_t vcpu)
 	{
 		auto shadow_page = std::find_if(shadow_pages.begin(), shadow_pages.end(),
-				[&page](ShadowPage& p) -> bool { return p.read_write == page; });
+			[&page, &vcpu](ShadowPage& p) -> bool { return p.read_write == page && p.vcpu == vcpu; });
 	
 		// if the page does not exist yet, we need to create it.
 		if (shadow_page == shadow_pages.end())
@@ -191,6 +193,7 @@ namespace libvmtrace
 			// make a new empty page to act as a shadow page.
 			shadow_page->execute = AllocatePage();
 			shadow_page->read_write = page;
+			shadow_page->vcpu = vcpu;
 
 			// copy over page contents to shadow page.
 			uint8_t buffer[PAGE_SIZE];
@@ -199,25 +202,38 @@ namespace libvmtrace
 			if (vmi_write_pa(guard.get(), page_to_addr(shadow_page->execute), PAGE_SIZE, &buffer, nullptr) != VMI_SUCCESS)
 				throw std::runtime_error("Could not write shadow page contents.");
 
-			// remap the pages into respective views.
-			if (vmi_slat_change_gfn(guard.get(), view_x, shadow_page->read_write, shadow_page->execute) != VMI_SUCCESS
-				|| vmi_slat_change_gfn(guard.get(), view_rw, shadow_page->execute, sink_page) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to map shadow page into EPT.");
+			// modify each vcpu that is affected by this change.
+			const auto set = vcpu == ALL_VCPU ? view_x : std::vector { view_x[vcpu] };
+			for (const auto& view : set)
+			{
+				// remap the pages into respective views.
+				if (vmi_slat_change_gfn(guard.get(), view, shadow_page->read_write, shadow_page->execute) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to map shadow page into EPT.");
 
-			// activate memory events on both the original and the shadow page.
-			if (vmi_set_mem_event(guard.get(), shadow_page->read_write, VMI_MEMACCESS_RW, view_x) != VMI_SUCCESS
-				|| vmi_set_mem_event(guard.get(), shadow_page->execute, VMI_MEMACCESS_RW, view_x) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to enable memory events for x view.");
+				// activate memory events on both the original and the shadow page.
+				if (vmi_set_mem_event(guard.get(), shadow_page->read_write, VMI_MEMACCESS_RW, view) != VMI_SUCCESS
+					|| vmi_set_mem_event(guard.get(), shadow_page->execute, VMI_MEMACCESS_RW, view) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to enable memory events for x view.");
+			}
+
+			// remap the affected page to sink in r/w view.
+			if (vmi_slat_change_gfn(guard.get(), view_rw, shadow_page->execute, sink_page) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to map shadow page into EPT.");
+			
+			// finally, enable events on the r/w view.
+			if (vmi_set_mem_event(guard.get(), shadow_page->read_write, VMI_MEMACCESS_X, view_rw) != VMI_SUCCESS
+				|| vmi_set_mem_event(guard.get(), shadow_page->execute, VMI_MEMACCESS_X, view_rw) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to enable memory events for r/w view.");
 		}
 
 		shadow_page->refs++;
 		return *shadow_page;
 	}
 	
-	ShadowPage ExtendedInjectionStrategy::UnreferenceShadowPage(addr_t page)
+	ShadowPage ExtendedInjectionStrategy::UnreferenceShadowPage(addr_t page, uint16_t vcpu)
 	{
 		const auto shadow_page = std::find_if(shadow_pages.begin(), shadow_pages.end(),
-				[&page](ShadowPage& p) -> bool { return p.read_write == page; });
+			[&page, &vcpu](ShadowPage& p) -> bool { return p.read_write == page && p.vcpu == vcpu; });
 
 		if (shadow_page == shadow_pages.end())
 			throw std::runtime_error("Tried to unreference a non-existing shadow page.");
@@ -225,7 +241,17 @@ namespace libvmtrace
 		// did we just lose the last reference to this page?
 		if (--shadow_page->refs == 0)
 		{
-			// TODO: unmap it from the slat...
+			LockGuard guard(sm);
+			
+			// unmap the pages from their respective views.
+			const auto set = vcpu == ALL_VCPU ? view_x : std::vector { view_x[vcpu] };
+			for (const auto& view : set)
+				if (vmi_slat_change_gfn(guard.get(), view, shadow_page->read_write, ~addr_t(0)) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to unmap shadow page from EPT.");
+
+			// unmap the sink in r/w view.
+			if (vmi_slat_change_gfn(guard.get(), view_rw, shadow_page->execute, ~addr_t(0)) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to unmap shadow page from EPT.");
 
 			FreePage(shadow_page->execute);
 			shadow_pages.erase(shadow_page);
@@ -265,9 +291,6 @@ namespace libvmtrace
 		LockGuard guard(sm);
 		const auto vmi_id = vmi_get_vmid(guard.get());
 
-		// open xenctrl interface.
-		const auto xc = xc_interface_open(nullptr, nullptr, 0);
-
 		// grab current value of ALTP2M.
 		uint64_t current_altp2m;
 		if (xc_hvm_param_get(xc, vmi_id, HVM_PARAM_ALTP2M, &current_altp2m) < 0)
@@ -285,9 +308,6 @@ namespace libvmtrace
 		// make enough room.
 		init_mem = xen->GetMaxMem();
 		xen->SetMaxMem(~0);
-
-		// close xenctrl interface.
-		xc_interface_close(xc);
 	}
 }
 

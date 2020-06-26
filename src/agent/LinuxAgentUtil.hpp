@@ -1,10 +1,7 @@
 
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <limits.h>
 #include <unistd.h>
-#include <cassert>
+#include <cstdint>
 #include <stdexcept>
 
 namespace linux_agent
@@ -13,27 +10,27 @@ namespace linux_agent
 	class temporary_file
 	{
 	public:
-		temporary_file(const std::string& name) : name(name)
+		temporary_file(const std::string& name)
 		{
-			assert(name.length() <= NAME_MAX);
-			const auto descriptor = shm_open(name.c_str(), O_CREAT | O_RDWR | O_TRUNC, S_IRWXU);
+			constexpr auto max_length = 249;
+
+			if (name.size() > max_length)
+				throw std::runtime_error("Temporary file name too large.");
+
+			descriptor = memfd_create(name.c_str(), 0);
 
 			if (descriptor == -1)
 				throw std::runtime_error("Could not aquire file descriptor to temporary file."); 
-			
-			// close the descriptor to the temporary file, ifstream will aquire it's own descriptor.
+		}
+
+		~temporary_file()
+		{
 			close(descriptor);
 		}
 
-		~temporary_file() noexcept(false)
+		int32_t get_descriptor() const
 		{
-			if (shm_unlink(name.c_str()) == -1)
-				throw std::runtime_error("Could not unlink temporary file from file system.");	
-		}
-
-		std::string get_mapped_name() const
-		{
-			return "/dev/shm" + name;
+			return descriptor;
 		}
 
 		temporary_file(temporary_file const& other) = delete;
@@ -42,7 +39,7 @@ namespace linux_agent
 		temporary_file& operator=(temporary_file&& other) = delete;
 
 	private:
-		std::string name;
+		int32_t descriptor;
 	};
 }
 
