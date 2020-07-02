@@ -404,9 +404,9 @@ namespace libvmtrace
 			minfd = filterfd; 
 			max_fds = std::min(minfd+1, (int)max_fds);
 		}
-		std::cout << "minfd: " << minfd << ", maxfd: " << max_fds << "\n";
+		//std::cout << "minfd: " << minfd << ", maxfd: " << max_fds << "\n";
 		
-		for(uint32_t it = 3; it < max_fds ; it++)
+		for(uint32_t it = minfd; it < max_fds ; it++)
 		{
 			addr_t file = 0;
 			uint32_t mode;
