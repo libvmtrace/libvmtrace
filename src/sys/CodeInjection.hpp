@@ -139,6 +139,7 @@ namespace libvmtrace
 		void Initialize();
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
 
+		static event_response_t HandleSchedulerEvent(vmi_instance_t vmi, vmi_event_t* event);
 		static event_response_t HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event);
 
 		ShadowPage ReferenceShadowPage(addr_t page, uint16_t vcpu);
@@ -153,8 +154,12 @@ namespace libvmtrace
 		uint64_t init_mem, last_page, sink_page;
 		uint16_t view_rw;
 		std::vector<uint16_t> view_x;
-		vmi_event_t mem_event;
-		
+		vmi_event_t scheduler_event, mem_event;
+		bool decommissioned{};
+
+		// paramters for injection.
+		bool hide{}, coordinated = true;
+
 		// we need these for now until the xc wrappers are in libvmi upstream.
 		uint64_t vmid;
 		xc_interface* xc;

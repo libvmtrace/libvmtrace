@@ -47,9 +47,19 @@ namespace libvmtrace
 			uint16_t view;
 			if (vmi_slat_create(guard.get(), &view) != VMI_SUCCESS)
 				throw std::runtime_error("Failed to create x view.");
-			if (xc_altp2m_set_visibility(xc, vmid, view, false) < 0)
+			if (hide && xc_altp2m_set_visibility(xc, vmid, view, false) < 0)
 				throw std::runtime_error("Could not hide x view.");
+			//if (coordinated && xc_altp2m_set_fast_switch(xc, vmid, i, view_rw, view) < 0)
+			//	throw std::runtime_error("Could not enable hypervisor-assisted EPTP switching.");
 			view_x.push_back(view);
+		}
+
+		// setup scheduler event.
+		if (coordinated)
+		{
+			SETUP_REG_EVENT(&scheduler_event, CR3, VMI_REGACCESS_W, false, HandleSchedulerEvent);
+			scheduler_event.data = this;
+			vmi_register_event(guard.get(), &scheduler_event);
 		}
 
 		// setup memory event.
@@ -69,15 +79,22 @@ namespace libvmtrace
 			return;
 		
 		LockGuard guard(sm);
-		
+		decommissioned = true;
+
 		// remove event handler.
-		vmi_clear_event(guard.get(), &mem_event, nullptr);
+		vmi_clear_event(guard.get(), &scheduler_event, nullptr);
+		if (coordinated)
+			vmi_clear_event(guard.get(), &mem_event, nullptr);
 		
 		// remove all custom views.
 		vmi_slat_switch(guard.get(), 0);
 		vmi_slat_destroy(guard.get(), view_rw);
-		for (const auto& view : view_x)
-			vmi_slat_destroy(guard.get(), view);
+		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
+		{
+			if (coordinated)
+				xc_altp2m_set_fast_switch(xc, vmid, i, 0, 0);
+			vmi_slat_destroy(guard.get(), view_x[i]);
+		}
 		vmi_slat_set_domain_state(guard.get(), false);
 
 		// free our sink page.
@@ -114,6 +131,13 @@ namespace libvmtrace
 		if (start_page != end_page)
 			throw std::runtime_error("EPT patch cannot modify multiple pages for now.");
 
+		// TODO: we can solve this by dynamically creating a new view for the process / page
+		// combination, but for now we just assume there are not different patches in different processes.
+		if (std::find_if(patches.begin(), patches.end(),
+			[&start_page](std::shared_ptr<Patch>& p) -> bool
+			{ return addr_to_page(p->location) == start_page; }) != patches.end())
+			throw std::runtime_error("EPT patch cannot modify the same page in two processes.");
+
 		// figure out where to place our patch within the shadow page.
 		const auto shadow_page = ReferenceShadowPage(start_page, patch->vcpu);
 		const auto offset = translate_page_offset(patch->location, page_to_addr(shadow_page.execute));
@@ -148,28 +172,58 @@ namespace libvmtrace
 		return InjectionStrategy::UndoPatch(patch);
 	}
 	
+	event_response_t ExtendedInjectionStrategy::HandleSchedulerEvent(vmi_instance_t vmi, vmi_event_t* event)
+	{
+		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
+		vmi_pid_t pid;
+
+		// reset active fast switching SLATs.
+		event->fast_switch.view_rw = 0;
+		event->fast_switch.view_x = 0;
+		
+		if (!instance->decommissioned && instance->coordinated
+			&& vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
+		{
+			auto patch = std::find_if(instance->patches.begin(), instance->patches.end(),
+				[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid; });
+
+			if (patch != instance->patches.end())
+			{
+				event->fast_switch.view_rw = instance->view_rw;
+				event->fast_switch.view_x = instance->view_x[event->vcpu_id];
+			}
+		}
+
+		return VMI_EVENT_RESPONSE_FAST_SWITCH;
+	}
+	
 	event_response_t ExtendedInjectionStrategy::HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event)
 	{
 		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
+
+		if (instance->decommissioned)
+			return 0;
 
 		if (event->mem_event.gfn == instance->sink_page)
 		{
 			std::cout << "Someone tried to access the sink page." << std::endl;
 			return VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
 		}
-		
-		const auto& target_x = instance->view_x[event->vcpu_id];
+	
+		if (instance->coordinated)
+			return 0;
 
+		const auto& target_x = instance->view_x[event->vcpu_id];
 		if (event->slat_id == instance->view_rw)
 		{
-			if (xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, true) < 0)
+			if (instance->hide && xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, true) < 0)
 				throw std::runtime_error("Could not make x view visible.");
 			event->slat_id = target_x;
 			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 		}
 		else if (event->slat_id == target_x)
 		{
-			if (xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, false) < 0)
+			if (instance->hide && xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, false) < 0)
 				throw std::runtime_error("Could not hide x view.");
 			event->slat_id = instance->view_rw;
 			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;

@@ -59,3 +59,6 @@ add_custom_command(TARGET linux_file_extraction_agent
 add_dependencies (vmtrace linux_file_extraction_agent)
 add_dependencies (linux_file_extraction_agent libvmi librdkafka libdwarfparser)
 
+install (TARGETS vmtrace DESTINATION lib)
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/src/" DESTINATION include FILES_MATCHING PATTERN "*.hpp")
+
