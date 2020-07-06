@@ -404,7 +404,7 @@ namespace libvmtrace
 		vmi_read_64_va(vmi, fdt + _fd_offset, 0, &fd);
 
 		// int count = 0;
-		int minfd = 3;
+		int minfd = 0;
 		if( filterfd >= 0 ) {  // if filterfd is specified, return only this file (if fd exists)
 			minfd = filterfd; 
 			max_fds = std::min(minfd+1, (int)max_fds);
