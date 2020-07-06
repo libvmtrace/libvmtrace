@@ -179,6 +179,7 @@ namespace libvmtrace
 	private:
 		addr_t _tgid_offset, _name_offset, _mm_offset, _tasks_offset, _parent_offset, _pgd_offset, _real_cred_offset, _uid_offset, _fs_offset, _pwd_offset;
 		addr_t _dentry_d_name_offset, _dentry_parent_offset;
+		addr_t _mount_mnt_mountpoint_offset, _mount_mnt_parent_offset, _mount_mnt_offset;
 		addr_t _files_offset, _fdt_offset, _fd_offset, _f_mode_offset, _f_path_offset;
 		addr_t _private_data_offset, _sk_offset, _u1_offset, _u3_offset;
 		addr_t _vm_end_offset, _vm_flags_offset, _vm_file_offset, _vm_pgoff_offset, _vm_next_offset, _exe_file_offset;
@@ -188,7 +189,7 @@ namespace libvmtrace
 		addr_t _socket_type_offset, _socket_family;
 
 		std::string d_path(addr_t path, vmi_instance_t vmi) const;
-		uint32_t create_path(addr_t dentry, char* buf, vmi_instance_t vmi) const;
+		uint32_t create_path(addr_t dentry, addr_t mnt, char* buf, vmi_instance_t vmi) const;
 		Process taskstruct_to_Process(addr_t current_process, vmi_instance_t vmi) const;
 
 		addr_t GetSyscallAddrVA(unsigned int syscall_nr, bool is32bit, vmi_instance_t vmi);

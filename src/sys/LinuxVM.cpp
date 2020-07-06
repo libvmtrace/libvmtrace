@@ -63,6 +63,10 @@ namespace libvmtrace
 		vmi_get_kernel_struct_offset(vmi,"dentry", "d_name",&_dentry_d_name_offset);
 		vmi_get_kernel_struct_offset(vmi,"dentry", "d_parent",&_dentry_parent_offset);
 
+		vmi_get_kernel_struct_offset(vmi,"mount", "mnt_mountpoint", &_mount_mnt_mountpoint_offset);
+		vmi_get_kernel_struct_offset(vmi,"mount", "mnt_parent", &_mount_mnt_parent_offset);
+		vmi_get_kernel_struct_offset(vmi,"mount", "mnt", &_mount_mnt_offset);
+
 		vmi_get_kernel_struct_offset(vmi,"task_struct", "files",&_files_offset);
 
 		vmi_get_kernel_struct_offset(vmi, "current_task", NULL, &_current_task_offset);
@@ -150,6 +154,7 @@ namespace libvmtrace
 
 		addr_t mm;
 		vmi_read_addr_va(vmi, current_process + _mm_offset, 0, &mm);
+		// TODO: FIXME: mm can be 0 (for a kernel thread)
 		addr_t pgd;
 		vmi_read_addr_va(vmi, mm + _pgd_offset, 0, &pgd);
 
@@ -471,14 +476,14 @@ namespace libvmtrace
 
 		// second item in qstr struct
 		// http://lxr.free-electrons.com/source/include/linux/dcache.h#L108
-		create_path(dentry, buf, vmi);
+		create_path(dentry, mnt - _mount_mnt_offset, buf, vmi);
 		if (strlen(buf) == 0)
 			return string("");
 
 		return string(buf);
 	}
 
-	uint32_t LinuxVM::create_path(addr_t dentry, char* buf, vmi_instance_t vmi) const
+	uint32_t LinuxVM::create_path(addr_t dentry, addr_t mnt, char* buf, vmi_instance_t vmi) const
 	{
 		addr_t name;
 		char* tmp;
@@ -492,21 +497,45 @@ namespace libvmtrace
 		
 		addr_t parent;
 		vmi_read_64_va(vmi, dentry+_dentry_parent_offset, 0, &parent);
-		if (parent != dentry) 
+		addr_t mnt_root;
+		vmi_read_64_va(vmi, mnt + _mount_mnt_offset, 0, &mnt_root);
+		addr_t mnt_mountpoint;
+		vmi_read_64_va(vmi, mnt + _mount_mnt_mountpoint_offset, 0, &mnt_mountpoint);
+		addr_t mnt_parent;
+		vmi_read_64_va(vmi, mnt + _mount_mnt_parent_offset, 0, &mnt_parent);
+#if 0
+		cout << setbase(16)
+			<< "dentry: "<<dentry
+			<< " parent: "<<parent
+			<< " mnt_root: "<<mnt_root
+			<< " mountpoint: "<<mnt_mountpoint
+			<< " mnt_parent: "<<mnt_parent  
+			<< " mnt: "<<mnt
+			<< " '"<< (tmp?tmp:"--") <<"'" << endl;
+#endif
+
+		if (parent != dentry && dentry != mnt_root)
 		{
-			create_path(parent, buf, vmi);
+			create_path(parent, mnt, buf, vmi);
+		} else {
+			// possibly root of current file system, continue with parent file system
+			if(mnt_parent != mnt) {
+				create_path(mnt_mountpoint, mnt_parent, buf, vmi);
+			}
 		}
-		
+	
 		if(parent == dentry && tmp[0] == '/') 
 		{
 			// strcat(buf, tmp);
 		} 
+		else if (dentry == mnt_root) {
+			// root (vfs-local or global)
+		}
 		else if (parent == dentry) 
 		{
 			strcat(buf, tmp);
 		}
-		
-		if(parent != dentry) 
+		else if(parent != dentry) 
 		{
 			strcat(buf, "/");
 			strcat(buf, tmp);
