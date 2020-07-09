@@ -89,10 +89,9 @@ namespace libvmtrace
 		const auto vmi_event = reinterpret_cast<const vmi_event_t* const>(data);
 
 		// determine process identifier.
-		//std::cout << "START\n";
+		// TODO: suppress these warnings, they are not a bug.
 		vmi_pid_t pid = 0;
 		vmi_dtb_to_pid(guard.get(), vmi_event->reg_event.value, &pid);
-		//std::cout << "END\n";
 
 		// TODO: temporary fix until we have the injection strategies
 		// and EPTP switching ready. fixes the issue with shared pages
