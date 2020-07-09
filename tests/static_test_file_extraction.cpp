@@ -85,11 +85,12 @@ int main(int argc, char** argv)
 			throw std::runtime_error("Failed to retrieve suitable process from VM.");
 		
 		// ask the user if we need the full file tree.
-		std::string skip;
+		/*std::string skip;
 		std::cout << "Skip file tree transmission [y/N]: ";
 		std::cin >> skip;
 		const auto should_skip = !skip.empty() && tolower(skip[0]) == 'y';
-
+		*/
+		const auto should_skip = true;
 		// inject the agent and create extract helper.
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);

@@ -3,6 +3,7 @@
 #include <util/LockGuard.hpp>
 #include <sys/LinuxVM.hpp>
 #include <memory>
+#include <unistd.h>
 
 namespace libvmtrace
 {
@@ -52,7 +53,7 @@ namespace libvmtrace
 	}
 
 	bool LinuxELFInjector::on_injection(const Event* event, void* data)
-	{	
+	{
 		const auto plist = vm->GetProcessList();
 		const auto result = std::find_if(plist.begin(), plist.end(),
 			[&](const auto& p) -> bool { return p.GetPid() == ((CodeInjection*) data)->child_pid; });
@@ -76,20 +77,67 @@ namespace libvmtrace
 	{
 		assert(forked);
 
+		// detach ourselves once we have completed the injection.
+		if (executed)
+		{
+			finished = true;
+			return true;
+		}
+
 		// access vmi event and target process.
 		LockGuard guard(sm);
 		const auto vmi_event = reinterpret_cast<const vmi_event_t* const>(data);
 
-		vmi_pid_t pid;
-		if (vmi_dtb_to_pid(guard.get(), vmi_event->reg_event.value, &pid) != VMI_SUCCESS
-				|| pid != child->GetPid())
+		// determine process identifier.
+		//std::cout << "START\n";
+		vmi_pid_t pid = 0;
+		vmi_dtb_to_pid(guard.get(), vmi_event->reg_event.value, &pid);
+		//std::cout << "END\n";
+
+		// TODO: temporary fix until we have the injection strategies
+		// and EPTP switching ready. fixes the issue with shared pages
+		// across different processes on single vcpu systems.
+		if (pid != child->GetPid())
+		{
+			// restore original page.
+			if (!stored_bytes.empty() && start > 0)
+			{
+				if (vmi_write_va(guard.get(), start, child->GetPid(),
+					stored_bytes.size(), stored_bytes.data(), nullptr) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to restore original page!");
+			}
+
 			return false;
-		
+		}
+		else if (!stored_bytes.empty())
+		{
+			// transfer the shellcode first.
+			if (vmi_write_va(guard.get(), start, child->GetPid(), shellcode.size,
+						const_cast<char*>(shellcode.data), nullptr) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to restore shellcode to target process.");
+
+			// write the size of executable at the start of the shellcode.
+			auto exec_size = static_cast<uint64_t>(executable->size());
+			if (vmi_write_64_va(guard.get(), start, child->GetPid(), &exec_size) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to restore executable size.");
+
+			// reinsert breakpoint.
+			const auto last_chance_va = start + 0xE1;
+			uint8_t int3 = 0xCC;
+			if (vmi_write_8_va(guard.get(), last_chance_va, child->GetPid(), &int3) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to restore breakpoint.");
+
+			return false;
+		}
+
 		// page table duplication is not done yet when the first cr3 changes happen,
 		// ideally we want a hook in the kernel to notify us when we are ready,
 		// but this will have to do for now.
-		if (++page_loop < 0x10)
+		if (page_loop < 0x10)
+		{
+			page_loop++;
 			return false;
+		}
 
 		// guest os scheduler just context switched our vcpu, clear out the cache.
 		vmi_v2pcache_flush(guard.get(), ~0ull);
@@ -153,9 +201,7 @@ namespace libvmtrace
 		sm->GetBPM()->InsertBreakpoint(mmap_break.get());
 		last_chance_break = std::make_unique<ProcessBreakpointEvent>("LAST CHANCE BP", 0, last_chance, *last_chance_listener);
 		sm->GetBPM()->InsertBreakpoint(last_chance_break.get());
-
-		// remove the cr3 listener that called us.
-		return true;
+		return false;
 	}
 
 	bool LinuxELFInjector::on_mmap_break(const Event* event, void* data)
@@ -241,7 +287,7 @@ namespace libvmtrace
 			throw std::runtime_error("Failed to restore original instructions.");
 
 		// finish mapping process.
-		finished = true;
+		executed = true;
 		return true;
 	}
 

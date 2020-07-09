@@ -129,7 +129,7 @@ namespace libvmtrace
 		std::unique_ptr<ProcessChangeEvent> cr3_change;
 		std::unique_ptr<ProcessBreakpointEvent> mmap_break, last_chance_break;
 		std::unique_ptr<SyscallEvent> execveat_call;
-		std::atomic<bool> forked{}, mapped{}, finished{};
+		std::atomic<bool> forked{}, mapped{}, executed{}, finished{};
 	};
 }
 

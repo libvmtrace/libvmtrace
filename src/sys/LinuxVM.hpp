@@ -43,9 +43,9 @@ namespace libvmtrace
 		addr_t breakpoint3;
 		addr_t breakpoint_pa3;
 
-		char* saved_code;
-		char* inject_code;
-		char* tmp;
+		char* saved_code = nullptr;
+		char* inject_code = nullptr;
+		char* tmp = nullptr;
 
 		size_t instr_size;
 		size_t total_page_text;
@@ -211,6 +211,7 @@ namespace libvmtrace
 
 		ProcessChangeEvent* _process_change;
 		std::vector<CodeInjection> _code_injections;
+		CodeInjection* _last_code_injection = nullptr;
 		CodeInjectionProcessorCr3 _code_injection_proc_cr3;
 		CodeInjectionProcessorInt3 _code_injection_proc_int3;
 	};
