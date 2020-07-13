@@ -4,6 +4,9 @@
 #include <sys/LinuxELFInjector.hpp>
 #include <sys/LinuxFileExtractor.hpp>
 #include <chrono>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 namespace libvmtrace
 {
@@ -1272,8 +1275,17 @@ namespace libvmtrace
 		if (it3 == _code_injections.end())
 		{
 			// determine process identifier.
+			// suppress these warnings, they are not a bug.
+			fflush(stdout);
+			int fd = dup(fileno(stdout));
+			int nullfd = open("/dev/null", O_WRONLY);
+			dup2(nullfd, fileno(stdout));
+			close(nullfd);
 			vmi_pid_t pid = 0;
 			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid);
+			fflush(stdout);
+			dup2(fd, fileno(stdout));
+			close(fd);
 
 			if (_last_code_injection && _last_code_injection->saved_code && pid != _last_code_injection->target_pid)
 			{

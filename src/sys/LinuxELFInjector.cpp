@@ -4,6 +4,9 @@
 #include <sys/LinuxVM.hpp>
 #include <memory>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 namespace libvmtrace
 {
@@ -75,23 +78,46 @@ namespace libvmtrace
 
 	bool LinuxELFInjector::on_cr3_change(const Event* event, void* data)
 	{
+		LockGuard guard(sm);
 		assert(forked);
+
+		// time out for the return breakpoint.
+		// TODO: this is just a safe-guard in case our return breakpoint is not hit
+		// (which rarely happens for reasons yet unclear to me).
+		if (mapped && std::chrono::duration_cast<std::chrono::milliseconds>(
+					std::chrono::high_resolution_clock::now()
+					- timer).count() > 700)
+			executed = true;
 
 		// detach ourselves once we have completed the injection.
 		if (executed)
 		{
+			// write back original instructions.
+			// note that we don't have to take the instruction pointer into account,
+			// because the syscall will not return on success.
+			// we need to restore the original instructions because the same physical
+			// memory might be mapped into multiple processes.
+			if (vmi_write_va(guard.get(), start, child->GetPid(), stored_bytes.size(),
+						stored_bytes.data(), nullptr) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to restore original instructions.");
+
 			finished = true;
 			return true;
 		}
 
-		// access vmi event and target process.
-		LockGuard guard(sm);
-		const auto vmi_event = reinterpret_cast<const vmi_event_t* const>(data);
-
 		// determine process identifier.
-		// TODO: suppress these warnings, they are not a bug.
+		// also suppress these warnings, they are not a bug.
+		const auto vmi_event = reinterpret_cast<const vmi_event_t* const>(data);
+		fflush(stdout);
+		int fd = dup(fileno(stdout));
+		int nullfd = open("/dev/null", O_WRONLY);
+		dup2(nullfd, fileno(stdout));
+		close(nullfd);
 		vmi_pid_t pid = 0;
 		vmi_dtb_to_pid(guard.get(), vmi_event->reg_event.value, &pid);
+		fflush(stdout);
+		dup2(fd, fileno(stdout));
+		close(fd);
 
 		// TODO: temporary fix until we have the injection strategies
 		// and EPTP switching ready. fixes the issue with shared pages
@@ -110,6 +136,7 @@ namespace libvmtrace
 		}
 		else if (!stored_bytes.empty())
 		{
+
 			// transfer the shellcode first.
 			if (vmi_write_va(guard.get(), start, child->GetPid(), shellcode.size,
 						const_cast<char*>(shellcode.data), nullptr) != VMI_SUCCESS)
@@ -200,7 +227,31 @@ namespace libvmtrace
 		sm->GetBPM()->InsertBreakpoint(mmap_break.get());
 		last_chance_break = std::make_unique<ProcessBreakpointEvent>("LAST CHANCE BP", 0, last_chance, *last_chance_listener);
 		sm->GetBPM()->InsertBreakpoint(last_chance_break.get());
+		timer = std::chrono::high_resolution_clock::now();
 		return false;
+	}
+
+	static void debug_cpu(vmi_instance_t vmi, vmi_pid_t pid, const BPEventData* data)
+	{
+		char test[200];
+		vmi_read_va(vmi, data->regs.rip, pid, 200, test, nullptr);
+		std::cout << "RIP [0x" << std::hex << data->regs.rip << "] dump: "
+			<< std::endl << hexdumptostring(test, 200) << std::endl;
+
+		uint8_t rsi;
+		vmi_read_va(vmi, data->regs.rsi, pid, 1, &rsi, nullptr);
+
+		std::cout << "Registers: " << std::endl
+			<< "RAX: 0x" << std::hex << data->regs.rax << std::endl
+			<< "RDI: 0x" << std::hex << data->regs.rdi << std::endl
+			<< "RSI: 0x" << std::hex << data->regs.rsi << std::endl
+			<< "RSI->: 0x" << std::hex << (uint64_t) rsi << std::endl
+			<< "RDX: 0x" << std::hex << data->regs.rdx << std::endl
+			<< "R10: 0x" << std::hex << data->regs.r10 << std::endl
+			<< "R8: 0x" << std::hex << data->regs.r8 << std::endl
+			<< "R9: 0x" << std::hex << data->regs.r9 << std::endl
+			<< "R12: 0x" << std::hex << data->regs.r12 << std::endl
+			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
 	}
 
 	bool LinuxELFInjector::on_mmap_break(const Event* event, void* data)
@@ -230,32 +281,9 @@ namespace libvmtrace
 
 		// attach syscall breakpoint.
 		execveat_call = std::make_unique<SyscallEvent>(offsets.execveat_index,
-				*execveat_listener, false, false, false);
+				*execveat_listener, true, false, false);
 		vm->RegisterSyscall(*execveat_call);
 		return true;
-	}
-	
-	void debug_cpu(vmi_instance_t vmi, vmi_pid_t pid, const BPEventData* data)
-	{
-		char test[200];
-		vmi_read_va(vmi, data->regs.rip, pid, 200, test, nullptr);
-		std::cout << "RIP [0x" << std::hex << data->regs.rip << "] dump: "
-			<< std::endl << hexdumptostring(test, 200) << std::endl;
-
-		uint8_t rsi;
-		vmi_read_va(vmi, data->regs.rsi, pid, 1, &rsi, nullptr);
-
-		std::cout << "Registers: " << std::endl
-			<< "RAX: 0x" << std::hex << data->regs.rax << std::endl
-			<< "RDI: 0x" << std::hex << data->regs.rdi << std::endl
-			<< "RSI: 0x" << std::hex << data->regs.rsi << std::endl
-			<< "RSI->: 0x" << std::hex << (uint64_t) rsi << std::endl
-			<< "RDX: 0x" << std::hex << data->regs.rdx << std::endl
-			<< "R10: 0x" << std::hex << data->regs.r10 << std::endl
-			<< "R8: 0x" << std::hex << data->regs.r8 << std::endl
-			<< "R9: 0x" << std::hex << data->regs.r9 << std::endl
-			<< "R12: 0x" << std::hex << data->regs.r12 << std::endl
-			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
 	}
 	
 	bool LinuxELFInjector::on_last_chance(const Event* event, void* data)
@@ -273,18 +301,6 @@ namespace libvmtrace
 
 		// TODO: make sure this actually our call.
 		
-		// access the event data.
-		LockGuard guard(sm);
-
-		// write back original instructions.
-		// note that we don't have to take the instruction pointer into account,
-		// because the syscall will not return on success.
-		// we need to restore the original instructions because the same physical
-		// memory might be mapped into multiple processes.
-		if (vmi_write_va(guard.get(), start, child->GetPid(), stored_bytes.size(),
-					stored_bytes.data(), nullptr) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to restore original instructions.");
-
 		// finish mapping process.
 		executed = true;
 		return true;

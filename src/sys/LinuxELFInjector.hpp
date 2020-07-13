@@ -130,6 +130,7 @@ namespace libvmtrace
 		std::unique_ptr<ProcessBreakpointEvent> mmap_break, last_chance_break;
 		std::unique_ptr<SyscallEvent> execveat_call;
 		std::atomic<bool> forked{}, mapped{}, executed{}, finished{};
+		std::chrono::time_point<std::chrono::high_resolution_clock> timer{};
 	};
 }
 
