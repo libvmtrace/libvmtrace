@@ -43,9 +43,11 @@ mkdir -p build && cd build && cmake .. && make
 Linux File Extraction Agent
 =======
 
-This project includes a precompiled agent that can be used to extract files from Linux virtual machines.
-To use this feature, you need atleast Linux 3.19 on the guest system.
+This project includes a precompiled agent that can be used to extract files from Linux virtual machines.\
+To use this feature, you need atleast Linux 3.19 on the guest system.\
 If you want to supply your own extraction agent (for example when porting this feature to other operating systems), supply a custom injection routine like LinuxVM::ExtractFile.
+If you just want to extract a file, take a look at tests/static_test_file_extraction.cpp.\
+Keep in mind libvmtrace does not support KPTI enabled kernels at this point.
 
 Saracenia Configuration
 =======

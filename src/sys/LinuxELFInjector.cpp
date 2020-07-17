@@ -62,8 +62,11 @@ namespace libvmtrace
 			[&](const auto& p) -> bool { return p.GetPid() == ((CodeInjection*) data)->child_pid; });
 		if (result == plist.end())
 		{
-			throw std::runtime_error("Failed to find forked process.");
-			return false;
+			//throw std::runtime_error("Failed to find forked process.");
+			//return false;
+			std::cout << "Failed to find process " << std::dec << ((CodeInjection*) data)->child_pid << std::endl;
+			finished = true;
+			return true;
 		}
 
 		// store off child process.
