@@ -29,44 +29,32 @@ namespace libvmtrace
 	static char mov_rax_addr[] = "\x48\xB8\xEF\xBE\xAD\xDE\x00\x00\x00\x00\x48\x8B\x00";
 	static char pop_rax[] = "\x58";
 
-	// note: the old shellcode stored the registers on the stack,
-	// which led to unpredictable behavior as the stack is shared
-	// between child and parent process. because the exec arguments
-	// are stored below the stack pointer by the vmi application,
-	// they overwrote the saved register values.
-	// the new solution is drastically more complex but should
-	// cover way more edge cases than the previous code.
 	/*
-		pushf			# store off eflags, our sub/add on the stack-pointer
-					# will change the carry bit and if the program reentered
-					# on a conditional jump, crazy things might happen.
-		sub rsp, 0x2000		# make room on the stack for arguments and return value.
-		push rax
-		pop rax			# practically a NOP, but now this stack frame must be paged in.
-		add rsp, 0x1000		# in this stack frame we will store the original registers
-		push rax		# will be overwritten by the system call return value.
-		push rcx		# rcx and r11 will be destroyed during the syscall.
-		push r11
-		mov rax, 0x3A
-		syscall			# vfork
-		pop r11
-		pop rcx
-		mov [rsp - 0xFF8], rax	# store child pid on the stack.
-		pop rax
-		add rsp, 0x1000
-		popf			# copy the eflags back in.
-		int 3			# interrupt to copy in the arguments to rsp - 0x2000
-		mov rax, 0x3B
-		syscall			# exec
-		mov rax, 0x3C
-		syscall			# exit
-	*/
-	static char code_syscall_vfork_exec[] = "\x9C\x48\x81\xEC\x00\x20\x00"
-		"\x00\x50\x58\x48\x81\xC4\x00\x10\x00\x00\x50\x51\x41\x53\x48"
-		"\xC7\xC0\x3A\x00\x00\x00\x0F\x05\x41\x5B\x59\x48\x89\x84\x24"
-		"\x08\xF0\xFF\xFF\x58\x48\x81\xC4\x00\x10\x00\x00\x9D\xCC\x48"
-		"\xC7\xC0\x3B\x00\x00\x00\x0F\x05\x48\xC7\xC0\x3C\x00\x00\x00"
-		"\x0F\x05";
+	 * 	pushf
+	 * 	push rax
+	 *	push rcx
+	 *	push r11
+	 *	mov rax, 0x3A
+	 *	syscall
+	 *	test rax, rax
+	 *	jz child
+	 *	pop r11
+	 *	pop rcx
+	 *	xchg rax, [rsp]
+	 *	add rsp, 8
+	 *	popf
+	 *
+	 * child:
+	 * 	int 3
+	 * 	mov rax, 0x3B
+	 * 	syscall
+	 * 	mov rax, 0x3C
+	 * 	syscall
+	 */
+	static char code_syscall_vfork_exec[] = "\x9C\x50\x51\x41\x53\x48\xC7\xC0\x3A\x00"
+		"\x00\x00\x0F\x05\x48\x85\xC0\x74\x0C\x41\x5B\x59\x48\x87\x04\x24\x48\x83"
+		"\xC4\x08\x9D\xCC\x48\xC7\xC0\x3B\x00\x00\x00\x0F\x05\x48\xC7\xC0\x3C\x00"
+		"\x00\x00\x0F\x05";
 	static char bin[] = "/bin/bash";
 	static char param1[] = "-c";
 
@@ -1164,7 +1152,7 @@ namespace libvmtrace
 			//int execve(const char *filename, char *const argv[], char *const envp[]);
 			//int execve("/bin/bash", {"/bin/bash", "-c", "<command>", 0}, envp[]);
 
-			reg_t rsp = a->regs.rsp - 0x2000;
+			reg_t rsp = a->regs.rsp;
 			addr_t orig_addr = rsp;
 			addr_t param1_addr = orig_addr;
 			size_t len = strlen(bin) + 1;
@@ -1261,8 +1249,8 @@ namespace libvmtrace
 #endif
 
 			CodeInjection ci = *it2;
-			// go back two pages + EFLAGS on the stack
-			vmi_read_64_va(vmi, a->regs.rsp - 0x2008, it2->target_pid, (uint64_t*) &ci.child_pid);
+			// pid is stored where rax was saved (+ EFLAGS).
+			vmi_read_64_va(vmi, a->regs.rsp - 2 * sizeof(uint64_t), it2->target_pid, (uint64_t*) &ci.child_pid);
 
 			vmi_set_vcpureg(vmi, (*it2).breakpoint1, RIP, a->vcpu);
 
@@ -1438,7 +1426,7 @@ namespace libvmtrace
 			vmi_translate_uv2p(vmi, (*it3).breakpoint1, pid, &breakpoint_pa);
 			(*it3).breakpoint_pa1 = breakpoint_pa;
 
-			(*it3).breakpoint2 = (*it3).breakpoint1 + 0x32;
+			(*it3).breakpoint2 = (*it3).breakpoint1 + 0x1F;
 			vmi_translate_uv2p(vmi, (*it3).breakpoint2, pid, &breakpoint_pa);
 			(*it3).breakpoint_pa2 = breakpoint_pa;
 

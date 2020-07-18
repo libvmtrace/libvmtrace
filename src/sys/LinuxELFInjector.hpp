@@ -47,7 +47,6 @@ namespace libvmtrace
 			 * 	cmp r11, r13
 			 * 	jg page_loop
 			 * int 3				# interrupt and request the host to map memory.
-			 * mov r13, rax
 			 * mov rax, 26				# msync
 			 * mov rdi, r13
 			 * mov rsi, [rip + s]
