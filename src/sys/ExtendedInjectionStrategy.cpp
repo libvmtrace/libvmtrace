@@ -49,18 +49,18 @@ namespace libvmtrace
 				throw std::runtime_error("Failed to create x view.");
 			if (hide && xc_altp2m_set_visibility(xc, vmid, view, false) < 0)
 				throw std::runtime_error("Could not hide x view.");
-			//if (coordinated && xc_altp2m_set_fast_switch(xc, vmid, i, view_rw, view) < 0)
-			//	throw std::runtime_error("Could not enable hypervisor-assisted EPTP switching.");
+			if (coordinated && xc_altp2m_add_fast_switch(xc, vmid, i, 0, view_rw, view) < 0)
+				throw std::runtime_error("Failed to enable fast switching.");
 			view_x.push_back(view);
 		}
 
 		// setup scheduler event.
-		if (coordinated)
+		/*if (coordinated)
 		{
 			SETUP_REG_EVENT(&scheduler_event, CR3, VMI_REGACCESS_W, false, HandleSchedulerEvent);
 			scheduler_event.data = this;
 			vmi_register_event(guard.get(), &scheduler_event);
-		}
+		}*/
 
 		// setup memory event.
 		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RWX, HandleMemEvent, 1);
@@ -82,9 +82,9 @@ namespace libvmtrace
 		decommissioned = true;
 
 		// remove event handler.
-		vmi_clear_event(guard.get(), &scheduler_event, nullptr);
 		if (coordinated)
-			vmi_clear_event(guard.get(), &mem_event, nullptr);
+			vmi_clear_event(guard.get(), &scheduler_event, nullptr);
+		vmi_clear_event(guard.get(), &mem_event, nullptr);
 		
 		// remove all custom views.
 		vmi_slat_switch(guard.get(), 0);
@@ -92,7 +92,7 @@ namespace libvmtrace
 		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
 		{
 			if (coordinated)
-				xc_altp2m_set_fast_switch(xc, vmid, i, 0, 0);
+				xc_altp2m_remove_fast_switch(xc, vmid, i, 0);
 			vmi_slat_destroy(guard.get(), view_x[i]);
 		}
 		vmi_slat_set_domain_state(guard.get(), false);
