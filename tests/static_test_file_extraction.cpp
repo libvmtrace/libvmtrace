@@ -13,6 +13,7 @@ std::shared_ptr<SystemMonitor> sm;
 std::shared_ptr<LinuxVM> vm;
 std::unique_ptr<Int3> bpm;
 std::unique_ptr<RegisterMechanism> rm;
+std::unique_ptr<LinuxFileExtractor> extractor;
 
 // shutdown routine.
 void shutdown(int sig)
@@ -23,6 +24,7 @@ void shutdown(int sig)
 	if (sm)
 		sm->Stop();
 
+	extractor = nullptr;
 	sm = nullptr;
 	bpm = nullptr;
 	rm = nullptr;
@@ -84,29 +86,24 @@ int main(int argc, char** argv)
 		const auto process = find_suitable_process(static_cast<vmi_pid_t>(std::stoi(argv[2])));
 		if (!process.has_value())
 			throw std::runtime_error("Failed to retrieve suitable process from VM.");
-		
-		// ask the user if we need the full file tree.
-		std::string skip;
-		std::cout << "Skip file tree transmission [y/N]: ";
-		std::cin >> skip;
-		const auto should_skip = !skip.empty() && tolower(skip[0]) == 'y';
 
 		// inject the agent and create extract helper.
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);
 		const auto child = vm->InjectELF(*process, agent);
-		LinuxFileExtractor extractor(sm, vm, child, agent, should_skip);
+		const auto should_skip = true;
+		extractor = std::make_unique<LinuxFileExtractor>(sm, vm, child, agent, should_skip);
 		
 		// helper lambda to wrap extraction and status indicator of file download.
-		const auto read_file = [&extractor](const std::string& name)
+		const auto read_file = [](const std::string& name)
 		{
 			std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-			extractor.open_file(name);
+			extractor->open_file(name);
 			
 			float progress{};
 			while (true)
 			{
-				const auto finished = extractor.read_chunk(&progress);
+				const auto finished = extractor->read_chunk(&progress);
 				const auto sym = static_cast<int32_t>(progress * 60);
 				const auto lhs = std::string(sym, '=');
 				const auto rhs = std::string(60 - sym, ' ');
@@ -120,10 +117,10 @@ int main(int argc, char** argv)
 
 			std::cout << std::endl;
 
-			if (!extractor.check_crc())
+			if (!extractor->check_crc())
 				std::cout << "File corrupted, invalid CRC." << std::endl;
 
-			extractor.close_file();
+			extractor->close_file();
 			std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 			std::cout << "Transmission duration: "
 				<< std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()
@@ -141,7 +138,7 @@ int main(int argc, char** argv)
 		std::cout << "Select target file: ";
 		std::string selection;
 		std::cin >> selection;
-		extractor.request_file(selection);
+		extractor->request_file(selection);
 
 		// extract target file.
 		read_file("./file");

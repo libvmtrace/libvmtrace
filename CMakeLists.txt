@@ -1,11 +1,15 @@
 
 cmake_minimum_required (VERSION 3.9)
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++17 -Ulinux")
+project (vmtrace)
+
+set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ulinux")
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-project (vmtrace)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PKG_GLIB REQUIRED glib-2.0)
@@ -70,3 +74,6 @@ add_subdirectory (src)
 add_subdirectory (tests)
 add_subdirectory (apps)
 
+if (NOT ${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
+	execute_process (COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/compile_commands.json ${CMAKE_SOURCE_DIR}/compile_commands.json)
+endif ()
