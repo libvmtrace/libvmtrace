@@ -254,29 +254,6 @@ namespace libvmtrace
 			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
 	}
 
-	void debug_cpu(vmi_instance_t vmi, vmi_pid_t pid, const BPEventData* data)
-	{
-		char test[200];
-		vmi_read_va(vmi, data->regs.rip, pid, 200, test, nullptr);
-		std::cout << "RIP [0x" << std::hex << data->regs.rip << "] dump: "
-			<< std::endl << hexdumptostring(test, 200) << std::endl;
-
-		uint8_t rsi;
-		vmi_read_va(vmi, data->regs.rsi, pid, 1, &rsi, nullptr);
-
-		std::cout << "Registers: " << std::endl
-			<< "RAX: 0x" << std::hex << data->regs.rax << std::endl
-			<< "RDI: 0x" << std::hex << data->regs.rdi << std::endl
-			<< "RSI: 0x" << std::hex << data->regs.rsi << std::endl
-			<< "RSI->: 0x" << std::hex << (uint64_t) rsi << std::endl
-			<< "RDX: 0x" << std::hex << data->regs.rdx << std::endl
-			<< "R10: 0x" << std::hex << data->regs.r10 << std::endl
-			<< "R8: 0x" << std::hex << data->regs.r8 << std::endl
-			<< "R9: 0x" << std::hex << data->regs.r9 << std::endl
-			<< "R12: 0x" << std::hex << data->regs.r12 << std::endl
-			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
-	}
-
 	bool LinuxELFInjector::on_mmap_break(const Event* event, void* data)
 	{
 		assert(forked);
