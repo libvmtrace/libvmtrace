@@ -5,6 +5,7 @@
 namespace libvmtrace
 {
 	using namespace util;
+	using namespace std::chrono_literals;
 
 	ExtendedInjectionStrategy::ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm) : InjectionStrategy(sm)
 	{
@@ -22,6 +23,19 @@ namespace libvmtrace
 
 		// enable altp2m support.
 		EnableAltp2m();
+
+		// setup scheduler events.
+		if (!coordinated)
+		{
+			SETUP_REG_EVENT(&scheduler_event, CR3, VMI_REGACCESS_W, false, HandleSchedulerEvent);
+			scheduler_event.data = this;
+			vmi_register_event(guard.get(), &scheduler_event);
+		}
+
+		// setup memory events.
+		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RWX, HandleMemEvent, 1);
+		mem_event.data = this;
+		vmi_register_event(guard.get(), &mem_event);
 
 		// create our sink page.
 		xen->GetMaxGFN(&last_page);
@@ -49,26 +63,11 @@ namespace libvmtrace
 				throw std::runtime_error("Failed to create x view.");
 			if (hide && xc_altp2m_set_visibility(xc, vmid, view, false) < 0)
 				throw std::runtime_error("Could not hide x view.");
-			if (coordinated && xc_altp2m_add_fast_switch(xc, vmid, i, 0, view_rw, view) < 0)
-				throw std::runtime_error("Failed to enable fast switching.");
 			view_x.push_back(view);
 		}
 
-		// setup scheduler event.
-		/*if (coordinated)
-		{
-			SETUP_REG_EVENT(&scheduler_event, CR3, VMI_REGACCESS_W, false, HandleSchedulerEvent);
-			scheduler_event.data = this;
-			vmi_register_event(guard.get(), &scheduler_event);
-		}*/
-
-		// setup memory event.
-		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RWX, HandleMemEvent, 1);
-		mem_event.data = this;
-		vmi_register_event(guard.get(), &mem_event);
-		
 		// make r/w view active.
-		if (vmi_slat_switch(guard.get(), view_rw) != VMI_SUCCESS)
+		if (!coordinated && vmi_slat_switch(guard.get(), view_rw) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to switch to rw view.");
 	}
 
@@ -77,9 +76,13 @@ namespace libvmtrace
 		// never initialized...
 		if (!xen)
 			return;
-		
+
 		LockGuard guard(sm);
 		decommissioned = true;
+
+		// make sure all rings have been processed.
+		while (vmi_are_events_pending(guard.get()))
+			std::this_thread::sleep_for(1ms);
 
 		// remove event handler.
 		if (coordinated)
@@ -90,11 +93,7 @@ namespace libvmtrace
 		vmi_slat_switch(guard.get(), 0);
 		vmi_slat_destroy(guard.get(), view_rw);
 		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
-		{
-			if (coordinated)
-				xc_altp2m_remove_fast_switch(xc, vmid, i, 0);
 			vmi_slat_destroy(guard.get(), view_x[i]);
-		}
 		vmi_slat_set_domain_state(guard.get(), false);
 
 		// free our sink page.
@@ -139,7 +138,7 @@ namespace libvmtrace
 			throw std::runtime_error("EPT patch cannot modify the same page in two processes.");
 
 		// figure out where to place our patch within the shadow page.
-		const auto shadow_page = ReferenceShadowPage(start_page, patch->vcpu);
+		const auto shadow_page = ReferenceShadowPage(start_page, patch->vcpu, patch->pid);
 		const auto offset = translate_page_offset(patch->location, page_to_addr(shadow_page.execute));
 	
 		// store off original shadow page contents.
@@ -149,7 +148,7 @@ namespace libvmtrace
 
 		// finally, we can make our changes to our shadow page.
 		if (vmi_write_pa(guard.get(), offset, patch->data.size(), patch->data.data(), nullptr) != VMI_SUCCESS)
-			return false;		
+			return false;
 
 		return InjectionStrategy::Apply(patch);
 	}
@@ -158,7 +157,7 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 
-		const auto shadow_page = UnreferenceShadowPage(addr_to_page(patch->location), patch->vcpu);
+		const auto shadow_page = UnreferenceShadowPage(addr_to_page(patch->location), patch->vcpu, patch->pid);
 
 		// if the unreferenced shadow page still has references elsewhere, we need to undo our changes.
 		if (shadow_page.execute)
@@ -177,24 +176,23 @@ namespace libvmtrace
 		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
 		vmi_pid_t pid;
 
-		// reset active fast switching SLATs.
-		event->fast_switch.view_rw = 0;
-		event->fast_switch.view_x = 0;
+		if (instance->coordinated)
+			return 0;
+
+		// disable altp2m on other processes.
+		event->slat_id = 0;
 		
-		if (!instance->decommissioned && instance->coordinated
-			&& vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
+		if (!instance->decommissioned &&
+			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
 		{
 			auto patch = std::find_if(instance->patches.begin(), instance->patches.end(),
 				[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid; });
 
 			if (patch != instance->patches.end())
-			{
-				event->fast_switch.view_rw = instance->view_rw;
-				event->fast_switch.view_x = instance->view_x[event->vcpu_id];
-			}
+				event->slat_id = instance->view_x[event->vcpu_id];
 		}
 
-		return VMI_EVENT_RESPONSE_FAST_SWITCH;
+		return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 	}
 	
 	event_response_t ExtendedInjectionStrategy::HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event)
@@ -210,9 +208,6 @@ namespace libvmtrace
 			return VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
 		}
 	
-		if (instance->coordinated)
-			return 0;
-
 		const auto& target_x = instance->view_x[event->vcpu_id];
 		if (event->slat_id == instance->view_rw)
 		{
@@ -232,7 +227,7 @@ namespace libvmtrace
 		return 0;
 	}
 
-	ShadowPage ExtendedInjectionStrategy::ReferenceShadowPage(addr_t page, uint16_t vcpu)
+	ShadowPage ExtendedInjectionStrategy::ReferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid)
 	{
 		auto shadow_page = std::find_if(shadow_pages.begin(), shadow_pages.end(),
 			[&page, &vcpu](ShadowPage& p) -> bool { return p.read_write == page && p.vcpu == vcpu; });
@@ -248,6 +243,11 @@ namespace libvmtrace
 			shadow_page->execute = AllocatePage();
 			shadow_page->read_write = page;
 			shadow_page->vcpu = vcpu;
+
+			// lookup dtb for the process that we are currently modifying.
+			addr_t dtb;
+			if (vmi_pid_to_dtb(guard.get(), pid, &dtb) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to retrieve DTB for modified process.");
 
 			// copy over page contents to shadow page.
 			uint8_t buffer[PAGE_SIZE];
@@ -268,6 +268,11 @@ namespace libvmtrace
 				if (vmi_set_mem_event(guard.get(), shadow_page->read_write, VMI_MEMACCESS_RW, view) != VMI_SUCCESS
 					|| vmi_set_mem_event(guard.get(), shadow_page->execute, VMI_MEMACCESS_RW, view) != VMI_SUCCESS)
 					throw std::runtime_error("Failed to enable memory events for x view.");
+
+				// activate fast switching.
+				const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
+				if (coordinated && xc_altp2m_add_fast_switch(xc, vmid, vind, dtb, view_rw, view) < 0)
+					throw std::runtime_error("Failed to enable fast switching.");
 			}
 
 			// remap the affected page to sink in r/w view.
@@ -284,7 +289,7 @@ namespace libvmtrace
 		return *shadow_page;
 	}
 	
-	ShadowPage ExtendedInjectionStrategy::UnreferenceShadowPage(addr_t page, uint16_t vcpu)
+	ShadowPage ExtendedInjectionStrategy::UnreferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid)
 	{
 		const auto shadow_page = std::find_if(shadow_pages.begin(), shadow_pages.end(),
 			[&page, &vcpu](ShadowPage& p) -> bool { return p.read_write == page && p.vcpu == vcpu; });
@@ -297,11 +302,22 @@ namespace libvmtrace
 		{
 			LockGuard guard(sm);
 			
+			// lookup dtb for the process that we are currently modifying.
+			addr_t dtb;
+			if (vmi_pid_to_dtb(guard.get(), pid, &dtb) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to retrieve DTB for modified process.");
+
 			// unmap the pages from their respective views.
 			const auto set = vcpu == ALL_VCPU ? view_x : std::vector { view_x[vcpu] };
 			for (const auto& view : set)
+			{
 				if (vmi_slat_change_gfn(guard.get(), view, shadow_page->read_write, ~addr_t(0)) != VMI_SUCCESS)
 					throw std::runtime_error("Failed to unmap shadow page from EPT.");
+
+				const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
+				if (coordinated && xc_altp2m_remove_fast_switch(xc, vmid, vind, dtb) < 0)
+					throw std::runtime_error("Failed to remove fast switching from process.");
+			}
 
 			// unmap the sink in r/w view.
 			if (vmi_slat_change_gfn(guard.get(), view_rw, shadow_page->execute, ~addr_t(0)) != VMI_SUCCESS)

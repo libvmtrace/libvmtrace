@@ -142,8 +142,8 @@ namespace libvmtrace
 		static event_response_t HandleSchedulerEvent(vmi_instance_t vmi, vmi_event_t* event);
 		static event_response_t HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event);
 
-		ShadowPage ReferenceShadowPage(addr_t page, uint16_t vcpu);
-		ShadowPage UnreferenceShadowPage(addr_t page, uint16_t vcpu);
+		ShadowPage ReferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid);
+		ShadowPage UnreferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid);
 
 		uint64_t AllocatePage();
 		void FreePage(uint64_t page);
