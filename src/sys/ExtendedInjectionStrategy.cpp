@@ -32,8 +32,11 @@ namespace libvmtrace
 			vmi_register_event(guard.get(), &scheduler_event);
 		}
 
-		// setup memory events.
-		SETUP_MEM_EVENT(&mem_event, ~0ULL, VMI_MEMACCESS_RWX, HandleMemEvent, 1);
+		// we need to register the memory event even on coordinated injection,
+		// because vmi_set_mem_event has a sanity check that prevents us from setting
+		// the EPT permissions if there is no suitable handler, however,
+		// in the coordinated case, the actual handler is never invoked.
+		SETUP_MEM_EVENT(&mem_event, ~0ull, VMI_MEMACCESS_RWX, HandleMemEvent, true);
 		mem_event.data = this;
 		vmi_register_event(guard.get(), &mem_event);
 
