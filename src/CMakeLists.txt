@@ -5,8 +5,7 @@ project (vmtrace)
 
 set (sys_files
 	sys/SystemMonitor.cpp
-	sys/Int3.cpp
-	sys/Altp2mBasic.cpp
+	sys/BreakpointMechanism.cpp
 	sys/Event.cpp
 	sys/Process.cpp
 	sys/ElfHelper.cpp

@@ -9,6 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <thread>
+#include <future>
 #include <iostream>
 #include <unistd.h>
 #include <sys/CodeInjection.hpp>
@@ -18,19 +19,12 @@ namespace libvmtrace
 	class BreakpointMechanism;
 	class RegisterMechanism;
 
-	enum bpm_type_t
-	{
-		INTTHREE, ALTP2M, DRAKVUF, NONE
-	};
-
-	class SystemMonitor
+	class SystemMonitor : public std::enable_shared_from_this<SystemMonitor>
 	{
 		public:
-			SystemMonitor(const std::string name, const bool event_support, const bool ept_support = false) :
-				_name(name), _initialized(false), _event_support(event_support), _bpm(nullptr),
-				_rm(nullptr), worker(nullptr), _profile(""), _is_locked(0), ept_support(ept_support) { }
-
-			~SystemMonitor();
+			SystemMonitor(const std::string name, const bool event_support,
+					const bool ept_support = false) noexcept(false);
+			~SystemMonitor() noexcept(false);
 
 			status_t Init();
 			void DeInit();
@@ -40,106 +34,67 @@ namespace libvmtrace
 			void Loop();
 			void Stop();
 
-			bool IsInitialized()
-			{
-				return _initialized;
-			}
-
 			bool IsEventSupported()
 			{
-				return _event_support;
+				return event_support;
 			}
 
 			const std::string GetName()
 			{
-				return _name;
+				return name;
 			}
 
 			void SetProfile(std::string profile)
 			{
-				_profile = profile;
+				this->profile = profile;
 			}
 
-			void SetBPM(BreakpointMechanism* bpm, bpm_type_t type)
+			std::shared_ptr<BreakpointMechanism> GetBPM()
 			{
-				_bpm = bpm;
-				_bpm_type = type;
+				return bpm;
 			}
 
-			BreakpointMechanism* GetBPM()
+			std::shared_ptr<RegisterMechanism> GetRM()
 			{
-				return _bpm;
-			}
-
-			bpm_type_t GetBPMType()
-			{
-				return _bpm_type;
-			}
-
-			// drakvuf_t& GetDrakvuf()
-			// {
-			// 	return _drakvuf;
-			// }
-
-			void SetRM(RegisterMechanism* rm)
-			{
-				_rm = rm;
-			}
-
-			RegisterMechanism* GetRM()
-			{
-				return _rm;
+				return rm;
 			}
 
 			void AddExludeAddress(addr_t address)
 			{
-				_exclude_addresses.push_back(address);
+				exclude_addresses.push_back(address);
 			}
 
 			bool IsExcludeAddress(addr_t address)
 			{
-				if(_exclude_addresses.empty())
-				{
-					return false;
-				}
-
-				if(find(_exclude_addresses.begin(), _exclude_addresses.end(), address) != _exclude_addresses.end()) 
-				{
-					return true;
-				}
-				else 
-				{
-					return false;
-				}
+				return std::find(exclude_addresses.begin(), exclude_addresses.end(), address)
+					!= exclude_addresses.end();
 			}
 
 			std::shared_ptr<InjectionStrategy> GetInjectionStrategy()
 			{
-				return _inj;
+				return inj;
 			}
 
 		private:
-			const std::string _name;
-			bool _initialized;
-			bool _event_support;
+			void ProcessEvents(); 
+
+			const std::string name;
+			bool initialized;
+			bool event_support;
 			bool ept_support;
 			
-			vmi_instance_t _vmi;
-			std::recursive_mutex _vmi_mtx;   
+			vmi_instance_t vmi;
+			std::recursive_mutex vmi_mtx;
 
-			BreakpointMechanism* _bpm;
-			bpm_type_t _bpm_type;
+			std::shared_ptr<BreakpointMechanism> bpm;
+			std::shared_ptr<RegisterMechanism> rm;
+			std::shared_ptr<InjectionStrategy> inj;
 
-			RegisterMechanism* _rm;
-			std::shared_ptr<InjectionStrategy> _inj;
+			std::vector<addr_t> exclude_addresses;
 
-			std::vector<addr_t> _exclude_addresses;
-
-			std::thread* worker;
-			std::string _profile;
-
-		protected:
-			int _is_locked;
+			std::shared_ptr<std::thread> worker;
+			std::promise<void> worker_exit;
+			std::string profile;
 	};
 }
 

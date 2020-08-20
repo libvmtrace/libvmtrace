@@ -14,22 +14,12 @@ using namespace libvmtrace;
 // vmtrace wrapper.
 std::shared_ptr<SystemMonitor> sm;
 std::shared_ptr<LinuxVM> vm;
-std::unique_ptr<Int3> bpm;
-std::unique_ptr<RegisterMechanism> rm;
 
 // shutdown routine.
 void shutdown(int sig)
 {
-	if (vm)
-		vm->Stop();
-	
-	if (sm)
-		sm->Stop();
-
-	sm = nullptr;
-	bpm = nullptr;
-	rm = nullptr;
 	vm = nullptr;
+	sm = nullptr;
 
 	exit(sig);
 }
@@ -71,19 +61,11 @@ int main(int argc, char** argv)
 
 	// create vmtrace wrapper objects.
 	sm = std::make_shared<SystemMonitor>(argv[1], true);
-	bpm = std::make_unique<Int3>(*sm);
-	rm = std::make_unique<RegisterMechanism>(*sm);
-	sm->SetBPM(bpm.get(), bpm->GetType());
-	sm->SetRM(rm.get());
 
 	// initialize vmtrace and delegate.
 	try
 	{
-		sm->Init();
-		bpm->Init();
-		rm->Init();
-		sm->Loop();
-		vm = std::make_unique<LinuxVM>(sm.get());
+		vm = std::make_unique<LinuxVM>(sm);
 		std::cout << "Successfully initiated VMI on " << argv[1] << "!" << std::endl;
 
 		const auto process = find_suitable_process(static_cast<vmi_pid_t>(std::stoi(argv[2])));

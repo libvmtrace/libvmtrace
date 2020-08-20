@@ -73,13 +73,7 @@ int main(int argc, char* argv[])
 	//sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 
-	SystemMonitor sm(argv[1], true);
-
-	Int3 int3(sm);
-	sm.SetBPM(&int3, int3.GetType());
-	sm.Init();
-	int3.Init();
-	sm.Loop();
+	auto sm = std::make_shared<SystemMonitor>(argv[1], true);
 
 	// Altp2m altp2m(sm);
 	// sm.SetProfile("/root/profiles/ubuntu/ubuntu1604-4.4.0-124-generic.json");
@@ -94,7 +88,7 @@ int main(int argc, char* argv[])
 	// altp2mbasic.Init();
 	// sm.Loop();
 
-	LinuxVM linux(&sm);
+	LinuxVM linux(sm);
 
 	Log* log = new Log();
 	log->RegisterLogger(new StdoutLogger(true));
@@ -128,15 +122,7 @@ int main(int argc, char* argv[])
 	cout << "ready" << endl;
 
 	while(!interrupted) 
-    {
-        sleep(1);
-    }
+		sleep(1);
 
-    // sm.GetBPM()->DeInit();
-    linux.Stop();
-	sm.Stop();
-
-    // delete log;
-
-    return 0;
+	return 0;
 }

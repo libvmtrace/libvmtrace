@@ -86,7 +86,7 @@ namespace libvmtrace
 		// (which rarely happens for reasons yet unclear to me).
 		if (mapped && std::chrono::duration_cast<std::chrono::milliseconds>(
 					std::chrono::high_resolution_clock::now()
-					- timer).count() > 700)
+					- timer).count() > 7000)
 			executed = true;
 
 		// detach ourselves once we have completed the injection.
@@ -148,7 +148,7 @@ namespace libvmtrace
 				throw std::runtime_error("Failed to restore executable size.");
 
 			// reinsert breakpoint.
-			const auto last_chance_va = start + 0xE1;
+			const auto last_chance_va = start + 0xD7;
 			uint8_t int3 = 0xCC;
 			if (vmi_write_8_va(guard.get(), last_chance_va, child->GetPid(), &int3) != VMI_SUCCESS)
 				throw std::runtime_error("Failed to restore breakpoint.");
@@ -207,7 +207,7 @@ namespace libvmtrace
 
 		// determine at which address the interrupt will occur.
 		const auto mmap_va = start + shellcode.interrupt_mmap;
-		const auto last_chance_va = start + 0xE1;
+		const auto last_chance_va = start + 0xD7;
 		if (vmi_translate_uv2p(guard.get(), mmap_va, child->GetPid(), &mmap) != VMI_SUCCESS
 				|| vmi_translate_uv2p(guard.get(), last_chance_va, child->GetPid(), &last_chance) != VMI_SUCCESS)
 			throw std::runtime_error("Could not translate virtual interrupt addresses to physical memory.");
@@ -298,6 +298,7 @@ namespace libvmtrace
 	{
 		assert(forked);
 		assert(mapped);
+		std::cout << "EXECVEAT!" << std::endl;
 
 		// TODO: make sure this actually our call.
 		

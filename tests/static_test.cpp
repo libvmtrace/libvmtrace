@@ -2,7 +2,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmtrace.hpp>
 #include <sys/LinuxVM.hpp>
-
+#include <util/LockGuard.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/async.h>
@@ -80,14 +80,8 @@ int main(int argc, char* argv[])
 	//sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 
-	SystemMonitor sm(argv[1], true);
+	const auto sm = std::make_shared<SystemMonitor>(argv[1], true);
 	
-	Int3 int3(sm);
-	sm.SetBPM(&int3, int3.GetType());
-	sm.Init();
-	int3.Init();
-	sm.Loop();
-
 	// Altp2m altp2m(sm);
 	// sm.SetProfile("/root/profiles/ubuntu/ubuntu1604-4.4.0-124-generic.json");
 	// sm.SetBPM(&altp2m, altp2m.GetType());
@@ -95,50 +89,49 @@ int main(int argc, char* argv[])
 	// altp2m.Init();
 	// sm.Loop();
 
-	LinuxVM linux(&sm);
+	LinuxVM linux(sm);
 
-	vector<Process> processes = linux.GetProcessList();
-
-	vmi_instance_t vmi = sm.Lock();
-	UNUSED(vmi);
-	for(vector<Process>::iterator it = processes.begin() ; it != processes.end(); ++it)
 	{
-		if((*it).GetName() != "hping3")
-			continue;
+		LockGuard guard(sm);
+		vector<Process> processes = linux.GetProcessList();
 
-		cout << dec << (*it).GetPid() << (*it).GetName() << "="<<(*it).GetPath() << endl;
-		pair<addr_t, addr_t> code = linux.GetCodeArea((*it).GetPid());
-		cout << hex << code.first << "-" << code.second << endl;
-
-		// addr_t start_p = 0;
-		// addr_t end_p = 0;
-
-		// vmi_translate_uv2p(vmi, code.first, (*it).GetPid(), &start_p);
-		// vmi_translate_uv2p(vmi, code.second, (*it).GetPid(), &end_p);
-
-		cout << hex << (code.first << 12) << "-" << (code.second << 12) << endl;
-		cout << endl;
-		vector<OpenFile> openfiles = linux.GetOpenFiles(*it);
-		for(vector<OpenFile>::iterator it2 = openfiles.begin() ; it2 != openfiles.end(); ++it2)
+		for(vector<Process>::iterator it = processes.begin() ; it != processes.end(); ++it)
 		{
-			cout << dec << (*it2).fd << " ----" << (*it2).path << endl;
-		}
+			if((*it).GetName() != "hping3")
+				continue;
 
-		vector<NetworkConnection> tcpconnections = linux.GetNetworkConnections(*it, TCP);
-		for(vector<NetworkConnection>::iterator it2 = tcpconnections.begin() ; it2 != tcpconnections.end(); ++it2)
-		{
-			cout << "Server: " << dec << (*it2).GetSource() << ":" << (*it2).GetSourcePort() << " ->  ";
-			cout << "Client: " << dec << (*it2).GetDestination() << ":" << (*it2).GetDestinationPort() << endl;
-		}
+			cout << dec << (*it).GetPid() << (*it).GetName() << "="<<(*it).GetPath() << endl;
+			pair<addr_t, addr_t> code = linux.GetCodeArea((*it).GetPid());
+			cout << hex << code.first << "-" << code.second << endl;
 
-	// 	// vector<vm_area> maps = linux.GetMMaps(*it);
-	// 	// for(vector<vm_area>::iterator it2 = maps.begin() ; it2 != maps.end(); ++it2)
-	// 	// {
-	// 	// 	cout << "----" << (*it2).path << ":"<<(*it2).access<<":"<<hex<<(*it2).start<<"-"<<(*it2).end<<"-"<<hex<<(*it2).flags<< endl;
-	// 	// }
+			// addr_t start_p = 0;
+			// addr_t end_p = 0;
+
+			// vmi_translate_uv2p(vmi, code.first, (*it).GetPid(), &start_p);
+			// vmi_translate_uv2p(vmi, code.second, (*it).GetPid(), &end_p);
+
+			cout << hex << (code.first << 12) << "-" << (code.second << 12) << endl;
+			cout << endl;
+			vector<OpenFile> openfiles = linux.GetOpenFiles(*it);
+			for(vector<OpenFile>::iterator it2 = openfiles.begin() ; it2 != openfiles.end(); ++it2)
+			{
+				cout << dec << (*it2).fd << " ----" << (*it2).path << endl;
+			}
+
+			vector<NetworkConnection> tcpconnections = linux.GetNetworkConnections(*it, TCP);
+			for(vector<NetworkConnection>::iterator it2 = tcpconnections.begin() ; it2 != tcpconnections.end(); ++it2)
+			{
+				cout << "Server: " << dec << (*it2).GetSource() << ":" << (*it2).GetSourcePort() << " ->  ";
+				cout << "Client: " << dec << (*it2).GetDestination() << ":" << (*it2).GetDestinationPort() << endl;
+			}
+
+		// 	// vector<vm_area> maps = linux.GetMMaps(*it);
+		// 	// for(vector<vm_area>::iterator it2 = maps.begin() ; it2 != maps.end(); ++it2)
+		// 	// {
+		// 	// 	cout << "----" << (*it2).path << ":"<<(*it2).access<<":"<<hex<<(*it2).start<<"-"<<(*it2).end<<"-"<<hex<<(*it2).flags<< endl;
+		// 	// }
+		}
 	}
-
-	sm.Unlock();
 
 	// string processesjson = linux.GetProcessesListJson(processes);
 	// UNUSED(processesjson);
@@ -179,14 +172,9 @@ int main(int argc, char* argv[])
 	UNUSED(close);
 
 	while(!interrupted) 
-    {
-        sleep(1);
-    }
+		sleep(1);
 
-    sm.GetBPM()->DeInit();
-    sm.Stop();
+	delete log;
 
-    delete log;
-
-    return 0;
+	return 0;
 }

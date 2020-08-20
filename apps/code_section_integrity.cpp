@@ -9,8 +9,8 @@ using namespace rapidjson;
 using namespace libvmtrace;
 using namespace libvmtrace::util;
 
-LinuxVM* _linux;
-SystemMonitor* _sm;
+std::shared_ptr<SystemMonitor> _sm;
+std::shared_ptr<LinuxVM> _linux;
 Log* _log;
 
 vmi_pid_t pid;
@@ -23,8 +23,8 @@ static void close_handler(int sig)
 {
 	if (sig == SIGSEGV) 
 	{
-		// _sm->GetBPM()->DeInit();
-		// _sm->Stop();
+		_linux = nullptr;
+		_sm = nullptr;
 	}
 
 	interrupted = true;
@@ -188,22 +188,8 @@ int main(int argc, char* argv[])
 
 	// string kafka_url = setting.GetStringValue("kafka_url");
 
-	SystemMonitor sm(argv[1], true);
-	_sm = &sm;
-	
-	Int3 int3(sm);
-	sm.SetBPM(&int3, int3.GetType());
-	sm.Init();
-	int3.Init();
-
-	RegisterMechanism rm(sm);
-	sm.SetRM(&rm);
-	rm.Init();
-
-	sm.Loop();
-
-	LinuxVM linux(&sm);
-	_linux = &linux;
+	_sm = std::make_shared<SystemMonitor>(argv[1], true);
+	_linux = std::make_shared<LinuxVM>(_sm);
 
 	_log = new Log();
 	// KafkaLogger* kl = new KafkaLogger(kafka_url);
@@ -212,18 +198,13 @@ int main(int argc, char* argv[])
 
 	TestListener tl;
 
-	vmi_instance_t vmi = sm.Lock();
+	vmi_instance_t vmi = _sm->Lock();
 
 	pid = atoi(argv[3]);
-	process_hash(vmi, linux);
+	process_hash(vmi, *_linux);
 
-	sm.Unlock();
+	_sm->Unlock();
 
 	while(!interrupted) 
-	{
 		sleep(1);
-	}
-
-	linux.Stop();
-	sm.Stop();
 }

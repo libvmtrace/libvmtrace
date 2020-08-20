@@ -31,12 +31,11 @@ namespace libvmtrace
 			virtual status_t RegisterProcessChange(ProcessChangeEvent& ev) = 0;
 			virtual status_t DeRegisterProcessChange(ProcessChangeEvent& ev) = 0;
 
-			virtual void Stop() = 0;
-
 			std::string GetProcessesListJson(std::vector<Process> processes);
+
 		protected:
-			OperatingSystem(SystemMonitor* sm) : _sm(sm) {};
-			SystemMonitor* _sm;
+			OperatingSystem(std::shared_ptr<SystemMonitor> sm) : _sm(sm) {};
+			std::shared_ptr<SystemMonitor> _sm;
 	};
 }
 

@@ -12,6 +12,8 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
+#include <sys/SyscallBasic.hpp>
+
 namespace libvmtrace
 {
 	class Event;
@@ -89,6 +91,11 @@ namespace libvmtrace
 			const addr_t _addr;
 	};
 
+	enum SyscallType
+	{
+		ALL_SYSCALLS, BEFORE_CALL, AFTER_CALL
+	};
+
 	class SyscallEvent : public Event
 	{
 		public:
@@ -122,6 +129,40 @@ namespace libvmtrace
 			
 		private:
 			vmi_pid_t _pid; 
+	};
+
+	class SyscallBreakpoint : public BreakpointEvent
+	{
+		public:
+			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson):
+								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
+								_nr(nr),
+								_type(type),
+								_is32bit(is32bit),
+								_processJson(processJson),
+								_syscall(nullptr) {}
+
+			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, SyscallBasic* s):
+								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
+								_nr(nr),
+								_type(type),
+								_is32bit(is32bit),
+								_processJson(processJson),
+								_syscall(s) {}
+
+			~SyscallBreakpoint() {}
+			inline int GetNr() const { return _nr; }
+			inline SyscallType GetType() const { return _type; }
+			inline SyscallBasic* GetSyscall() const { return _syscall; }
+			inline bool Is32bit() const { return _is32bit; }
+			inline bool ProcessJson() const { return _processJson; }
+
+		private:
+			int _nr;
+			SyscallType _type;
+			bool _is32bit;
+			bool _processJson;
+			SyscallBasic* _syscall;
 	};
 
 	// The EventManager: It manages Event structures and calls EventListeners

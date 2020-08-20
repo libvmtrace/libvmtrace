@@ -1,6 +1,7 @@
 
 #include <sys/CodeInjection.hpp>
 #include <util/LockGuard.hpp>
+#include <libvmi/slat.h>
 
 namespace libvmtrace
 {
@@ -80,18 +81,29 @@ namespace libvmtrace
 		if (!xen)
 			return;
 
-		LockGuard guard(sm);
-		decommissioned = true;
+		{
+			LockGuard guard(sm);
+			decommissioned = true;
+		}
 
 		// make sure all rings have been processed.
-		while (vmi_are_events_pending(guard.get()))
+		for (;;)
+		{
+			{
+				LockGuard guard(sm);
+				if (!vmi_are_events_pending(guard.get()))
+					break;
+			}
 			std::this_thread::sleep_for(1ms);
+		}
+
+		LockGuard guard(sm);
 
 		// remove event handler.
 		if (coordinated)
 			vmi_clear_event(guard.get(), &scheduler_event, nullptr);
 		vmi_clear_event(guard.get(), &mem_event, nullptr);
-		
+
 		// remove all custom views.
 		vmi_slat_switch(guard.get(), 0);
 		vmi_slat_destroy(guard.get(), view_rw);

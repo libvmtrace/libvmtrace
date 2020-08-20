@@ -49,15 +49,9 @@ int main(int argc, char* argv[])
 	string kafka_url = setting.GetStringValue("kafka_url");
 	string command_topic = setting.GetStringValue("kafka_command_topic");
 
-	SystemMonitor sm(argv[1], true);
-	Int3* int3 = new Int3(sm);
-	sm.SetBPM(int3, int3->GetType());
-	sm.Init();
-	int3->Init();
-	sm.Loop();
-	
-	LinuxVM linux(&sm);
-	ProcessCache pc(linux);
+	const auto sm = std::make_shared<SystemMonitor>(argv[1], true);
+	const auto linux = std::make_shared<LinuxVM>(sm);
+	ProcessCache pc(*linux);
 
 	string vm_id = argv[1];
 
@@ -67,8 +61,8 @@ int main(int argc, char* argv[])
 	// UNUSED(kl);
 	// log->RegisterLogger(kl);
 
-	SyscallLogger sl(vm_id, linux, pc, *log);
-	ProcessListLogger pll(vm_id, linux, pc, *log);
+	SyscallLogger sl(vm_id, *linux, pc, *log);
+	ProcessListLogger pll(vm_id, *linux, pc, *log);
 	
 	Controller c;
 	c.RegisterPlugin(sl);
@@ -89,13 +83,8 @@ int main(int argc, char* argv[])
 	// c.ExecuteCommand("ProcessListLogger", "EnablePeriodic", params2, "0", vm_id);
 
 	while(!interrupted) 
-	{
 		kc.GetCommands();
-		// sleep(1);
-	}
 
-	linux.Stop();
-	sm.Stop();
-
+	delete log;
 	return 0;
 }

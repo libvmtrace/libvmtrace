@@ -108,9 +108,6 @@ namespace libvmtrace
 	protected:
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch)
 		{
-			patches.erase(std::remove(patches.begin(),
-					patches.end(),
-					patch));	
 			return true;
 		}
 	

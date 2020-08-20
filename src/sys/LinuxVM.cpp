@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/LinuxELFInjector.hpp>
 #include <sys/LinuxFileExtractor.hpp>
+#include <util/LockGuard.hpp>
 #include <chrono>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,18 +14,12 @@ namespace libvmtrace
 	using namespace std; 
 	using namespace util;
 
-	// mov rax rbx
-	// static char code[] = "\x48\x8B\x03";
-
 	/*
-	push rax
-	mov rax, <address>
-	mov rax, [rax]
-	pop rax
+	 * push rax
+	 * mov rax, <address>
+	 * mov rax, [rax]
+	 * pop rax
 	*/
-	// static char code_page_fault[]= "\x50\x48\xB8\x00\x00\x00\x00\x00\x00\x00\x00\x48\x8B\x00\x58";
-	// static char code_page_fault2[] = "\x50\x48\xB8\xEF\xBE\xAD\xDE\x00\x00\x00\x00\x48\x8B\x00\x48\xB8\xEF\xBE\xAD\xDE\x00\x00\x00\x00\x48\x8B\x00\x48\xB8\xEF\xBE\xAD\xDE\x00\x00\x00\x00\x48\x8B\x00\x58";
-
 	static char push_rax[] = "\x50";
 	static char mov_rax_addr[] = "\x48\xB8\xEF\xBE\xAD\xDE\x00\x00\x00\x00\x48\x8B\x00";
 	static char pop_rax[] = "\x58";
@@ -58,9 +53,8 @@ namespace libvmtrace
 	static char bin[] = "/bin/bash";
 	static char param1[] = "-c";
 
-	LinuxVM::LinuxVM(SystemMonitor* sm) : OperatingSystem(sm), _syscallProc(this), 
-											_process_change(nullptr), 
-											_code_injection_proc_cr3(this), _code_injection_proc_int3(this)
+	LinuxVM::LinuxVM(std::shared_ptr<SystemMonitor> sm) : OperatingSystem(sm), _syscallProc(this), 
+		_process_change(nullptr), _code_injection_proc_cr3(this), _code_injection_proc_int3(this)
 	{
 		vmi_instance_t vmi = sm->Lock();
 
@@ -121,16 +115,30 @@ namespace libvmtrace
 		sm->Unlock();
 	}
 
+	LinuxVM::~LinuxVM()
+	{
+		LockGuard guard(_sm);
+
+		for (vector<CodeInjection>::iterator it = _code_injections.begin() ; it != _code_injections.end();)
+		{
+			if ((*it).type == PAGE_FAULT)
+				vmi_write_va(guard.get(), (*it).entry_addr, (*it).target_pid, (*it).instr_size, (*it).saved_code, NULL);
+			else if ((*it).type == FORK_EXEC)
+				vmi_write_va(guard.get(), (*it).breakpoint1, (*it).target_pid, (*it).instr_size, (*it).saved_code, NULL);
+
+			it = _code_injections.erase(it);
+		}
+	}
+
 	Process LinuxVM::GetCurrentProcess(addr_t gs_base) const
 	{
-		vmi_instance_t vmi = _sm->Lock();
+		LockGuard guard(_sm);
 
                 addr_t current_process;
 		addr_t cpptr = gs_base + _current_task_offset;
-                vmi_read_addr_va(vmi, cpptr, 0, &current_process);
+                vmi_read_addr_va(guard.get(), cpptr, 0, &current_process);
 
-		Process p = taskstruct_to_Process(current_process, vmi);
-                _sm->Unlock();
+		Process p = taskstruct_to_Process(current_process, guard.get());
 		return p;
 	}
 
@@ -639,7 +647,7 @@ namespace libvmtrace
 
 	bool SyscallProcessor::callback(const Event* ev, void* data)
 	{
-		SystemMonitor* sm = _lvm->GetSystemMonitor();
+		const auto sm = _lvm->GetSystemMonitor();
 		vmi_instance_t vmi = sm->Lock();
 
 		bool ret = _lvm->ProcessSyscall((SyscallBreakpoint*) ev, data, vmi);
@@ -650,7 +658,7 @@ namespace libvmtrace
 
 	bool CodeInjectionProcessorInt3::callback(const Event* ev, void* data)
 	{
-		SystemMonitor* sm = _lvm->GetSystemMonitor();
+		const auto sm = _lvm->GetSystemMonitor();
 
 		BPEventData* a = (BPEventData*) data;
 		if(!a->beforeSingleStep)
@@ -666,7 +674,7 @@ namespace libvmtrace
 
 	bool CodeInjectionProcessorCr3::callback(const Event* ev, void* data)
 	{
-		SystemMonitor* sm = _lvm->GetSystemMonitor();
+		const auto sm = _lvm->GetSystemMonitor();
 		vmi_instance_t vmi = sm->Lock();
 
 		vmi_event_t* a = (vmi_event_t*) data;
@@ -705,9 +713,7 @@ namespace libvmtrace
 #endif
 
 		if(bpd->beforeSingleStep)
-		{
 			return false;
-		}
 		else
 		{
 			if(ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
@@ -723,7 +729,7 @@ namespace libvmtrace
 		{
 			struct returnhelper rh;
 			rh.nr = ev->GetNr();
-			rh.ret_required = false; 
+			rh.ret_required = false;
 
 			if (ev->Is32bit())
 			{
@@ -1470,6 +1476,7 @@ namespace libvmtrace
 			// cout << hexdumptostring(tmp, 5) << endl;
 
 			// delete[] tmp;
+
 #ifdef VMTRACE_DEBUG
 			addr_t code_paddr = 0;
 			vmi_translate_uv2p(vmi, (*it3).breakpoint1, pid, &code_paddr);
@@ -1599,12 +1606,6 @@ namespace libvmtrace
 		cout << "invoke page fault begin" << endl;
 #endif
 
-		if(_sm->GetBPM()->GetType() != INTTHREE)
-		{
-			cerr << "Current BPM not supported" << endl;
-			return VMI_FAILURE;
-		}
-
 		if(_sm->GetRM() == nullptr)
 		{
 			cerr << "RegisterMechanism is required to do code injection" << endl;
@@ -1685,12 +1686,6 @@ namespace libvmtrace
 		cout << "invoke code injection begin" << endl;
 #endif
 
-		if(_sm->GetBPM()->GetType() != INTTHREE)
-		{
-			cerr << "Current BPM not supported" << endl;
-			return VMI_FAILURE;
-		}
-
 		if(_sm->GetRM() == nullptr)
 		{
 			cerr << "RegisterMechanism is required to do code injection" << endl;
@@ -1749,17 +1744,11 @@ namespace libvmtrace
 
 	Process LinuxVM::InjectELF(const Process& p, std::vector<uint8_t>& executable)
 	{
-		// TODO: we want to use smart pointers everywhere,
-		// so transition to enable_shared_from_this
-		// soon (TM). this is just a dirty hack so we can call
-		// into the elf injector part.
-		std::shared_ptr<SystemMonitor> sm(std::shared_ptr<SystemMonitor>{}, _sm);
-		std::shared_ptr<LinuxVM> vm(std::shared_ptr<LinuxVM>{}, this);
 		std::shared_ptr<std::vector<uint8_t>> exe(
 				std::shared_ptr<std::vector<uint8_t>>{}, &executable);
 		
 		// pass it into the wrapping class.
-		LinuxELFInjector elf(sm, vm, p);
+		LinuxELFInjector elf(_sm, shared_from_this(), p);
 		return elf.inject_executable(exe);
 	}
 	
@@ -1776,18 +1765,11 @@ namespace libvmtrace
 	{
 		using namespace file_extraction;
 
-		// TODO: we want to use smart pointers everywhere,
-		// so transition to enable_shared_from_this
-		// soon (TM). this is just a dirty hack so we can call
-		// into the file extractor part.
-		std::shared_ptr<SystemMonitor> sm(std::shared_ptr<SystemMonitor>{}, _sm);
-		std::shared_ptr<LinuxVM> vm(std::shared_ptr<LinuxVM>{}, this);
-		
 		// prepare extraction agent and setup communication.
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);
 		const auto child = InjectELF(p, agent);
-		LinuxFileExtractor extractor(sm, vm, child, agent);
+		LinuxFileExtractor extractor(_sm, shared_from_this(), child, agent);
 
 		// request the file and dump it onto local filesystem.
 		extractor.request_file(file);
@@ -1827,6 +1809,7 @@ namespace libvmtrace
 		_sm->GetRM()->InsertRegisterEvent(&ev);
 		return VMI_SUCCESS;
 	}
+
 	status_t LinuxVM::DeRegisterProcessChange(ProcessChangeEvent& ev)
 	{
 		if(_sm->GetRM() == nullptr)
@@ -1838,97 +1821,16 @@ namespace libvmtrace
 		return VMI_SUCCESS;
 	}
 
-	void LinuxVM::Stop()
-	{
-		vmi_instance_t vmi = _sm->Lock();
-
-		if(_code_injections.size() != 0)
-		{
-			for(vector<CodeInjection>::iterator it = _code_injections.begin() ; it != _code_injections.end() ;)
-			{
-				if((*it).type == PAGE_FAULT)
-				{
-					vmi_write_va(vmi, (*it).entry_addr, (*it).target_pid, (*it).instr_size, (*it).saved_code, NULL);
-				}
-				else if((*it).type == FORK_EXEC)
-				{
-					vmi_write_va(vmi, (*it).breakpoint1, (*it).target_pid, (*it).instr_size, (*it).saved_code, NULL);
-				}
-
-				it = _code_injections.erase(it);
-			}
-		}
-
-		_sm->DeInit();
-
-		if(_sm->GetBPM() != nullptr)
-		{
-			_sm->GetBPM()->DeInit();
-		}
-		
-		if(_sm->GetRM() != nullptr)
-		{
-			_sm->GetRM()->DeInit();
-		}
-
-		_sm->Unlock();
-	//	_sm->Stop();
-	}
-
 	status_t LinuxVM::PauseSyscall(SyscallEvent& ev)
 	{
-		if (ev.Is32bit())
-		{
-			if (_SyscallEvents32.GetCount(ev.GetNr()) == 1)
-			{
-				std::map<int, const SyscallBreakpoint>::iterator it;
-				if ((it = _Syscallbps32.find(ev.GetNr())) != _Syscallbps32.end())
-				{
-					return _sm->GetBPM()->TemporaryRemoveBreakpoint(&it->second);
-				}
-			}
-		}
-		else 
-		{
-			if (_SyscallEvents64.GetCount(ev.GetNr()) == 1)
-			{
-				map<int, const SyscallBreakpoint>::iterator it;
-				if ((it = _Syscallbps64.find(ev.GetNr())) != _Syscallbps64.end())
-				{
-					return _sm->GetBPM()->TemporaryRemoveBreakpoint(&it->second);
-				}
-			}
-		}
-
-		return VMI_FAILURE;
+		_sm->GetBPM()->Disable();
+		return VMI_SUCCESS;
 	}
 
 	status_t LinuxVM::ResumeSyscall(SyscallEvent& ev)
 	{
-		if (ev.Is32bit())
-		{
-			if (_SyscallEvents32.GetCount(ev.GetNr()) == 1)
-			{
-				std::map<int, const SyscallBreakpoint>::iterator it;
-				if ((it = _Syscallbps32.find(ev.GetNr())) != _Syscallbps32.end())
-				{
-					return _sm->GetBPM()->ReInsertBreakpoint(&it->second);
-				}
-			}
-		}
-		else 
-		{
-			if (_SyscallEvents64.GetCount(ev.GetNr()) == 1)
-			{
-				map<int, const SyscallBreakpoint>::iterator it;
-				if ((it = _Syscallbps64.find(ev.GetNr())) != _Syscallbps64.end())
-				{
-					return _sm->GetBPM()->ReInsertBreakpoint(&it->second);
-				}
-			}
-		}
-
-		return VMI_FAILURE;
+		_sm->GetBPM()->Enable();
+		return VMI_SUCCESS;
 	}
 }
 

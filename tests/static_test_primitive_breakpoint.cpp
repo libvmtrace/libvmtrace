@@ -1,6 +1,7 @@
 
 #include <libvmtrace.hpp> 
 #include <sys/LinuxVM.hpp>
+#include <util/LockGuard.hpp>
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -9,16 +10,29 @@
 #include <optional>
 
 using namespace libvmtrace;
+using namespace util;
 
 // vmtrace wrapper.
 std::shared_ptr<SystemMonitor> sm;
 std::shared_ptr<LinuxVM> vm;
 
+class TestListener : public EventListener
+{
+	public:
+		bool callback(const Event* ev, void* data)
+		{
+			const auto bp_event = reinterpret_cast<const BPEventData* const>(data);
+			LockGuard guard(sm);
+			vmi_set_vcpureg(guard.get(), 1, RAX, bp_event->vcpu);
+			return false;
+		}
+};
+
 // shutdown routine.
 void shutdown(int sig)
 {
-	sm = nullptr;
 	vm = nullptr;
+	sm = nullptr;
 
 	exit(sig);
 }
@@ -52,9 +66,9 @@ int main(int argc, char** argv)
 	sigaction(SIGSEGV, &act, nullptr);
 
 	// print usage.
-	if (argc < 5)
+	if (argc < 4)
 	{
-		std::cerr << "USAGE: " << argv[0] << " [VM_NAME] [PID] [ADDR] [BYTE]" << std::endl;
+		std::cerr << "USAGE: " << argv[0] << " [VM_NAME] [PID] [ADDR]" << std::endl;
 		return 1;
 	}
 
@@ -74,16 +88,14 @@ int main(int argc, char** argv)
 		std::cout << "Found process: " << process->GetName() << std::endl;
 		
 		const auto addr = static_cast<addr_t>(std::stoi(argv[3]));
-		const auto byte = static_cast<uint8_t>(std::stoi(argv[4]));
-		const auto patch = std::make_shared<Patch>(addr, process->GetPid(), ALL_VCPU, std::vector<uint8_t>{ byte });
-		if (!sm->GetInjectionStrategy()->Apply(patch))
-			throw std::runtime_error("Failed to apply patch!");
+		TestListener test_listener{};
+		const auto bp = std::make_unique<ProcessBreakpointEvent>("Test", process->GetPid(), addr, test_listener);
+		sm->GetBPM()->InsertBreakpoint(bp.get());
 
-		std::cout << "Applied patch, press any key to undo it!" << std::endl;
+		std::cout << "Set breakpoint, press any key to undo it!" << std::endl;
 		std::cin.get();
-		if (!sm->GetInjectionStrategy()->Undo(patch))
-			throw std::runtime_error("Failed to undo patch!");
-		
+		sm->GetBPM()->RemoveBreakpoint(bp.get());
+
 		std::cout << "Restored original!" << std::endl;
 	}
 	catch (const std::exception& e)
