@@ -727,35 +727,39 @@ namespace libvmtrace
 
 		if (ev->GetType() == BEFORE_CALL)
 		{
-			struct returnhelper rh;
-			rh.nr = ev->GetNr();
-			rh.ret_required = false;
+			auto ret_required = false;
 
 			if (ev->Is32bit())
-			{
-				_SyscallEvents32.ForEach(ReturnValueRequired, (void*)&rh);
-			}
+				for (auto& e : _SyscallEvents32)
+					if (e.first == ev->GetNr() && e.second->WithRet())
+					{
+						ret_required = true;
+						break;
+					}
 			else
-			{
-				_SyscallEvents64.ForEach(ReturnValueRequired, (void*)&rh);
-			}
+				for (auto& e : _SyscallEvents64)
+					if (e.first == ev->GetNr() && e.second->WithRet())
+					{
+						ret_required = true;
+						break;
+					}
 
 			SyscallBasic* s = nullptr;
 
 			if(ev->ProcessJson())
 			{
-				s = new SyscallJson(vmi, vcpu, true, ev->Is32bit(), rh.ret_required, regs);
+				s = new SyscallJson(vmi, vcpu, true, ev->Is32bit(), ret_required, regs);
 				// (static_cast<SyscallJson*>(s))->PreProcess(*this, ev->GetNr(), vmi);
 			}
 			else
 			{
-				s = new SyscallBasic(vmi, vcpu, true, ev->Is32bit(), rh.ret_required, regs);
+				s = new SyscallBasic(vmi, vcpu, true, ev->Is32bit(), ret_required, regs);
 				// s->PreProcess(*this, ev->GetNr(), vmi);
 			}
 
 			s->PreProcess(*this, ev->GetNr(), vmi);
 
-			if (rh.nr != 59 && (rh.ret_required || s->PageFault())) 
+			if (ev->GetNr() != 59 && (ret_required || s->PageFault()))
 			{
 				addr_t paddr = 0;
 				vmi_pagetable_lookup(vmi, s->GetDtb(), s->GetRip(), &paddr);
@@ -767,13 +771,17 @@ namespace libvmtrace
 			} 
 			else 
 			{
-				if (ev->Is32bit()) 
+				if (ev->Is32bit())
 				{
-					_SyscallEvents32.Call(ev->GetNr(), (void*)s);
-				} 
-				else 
+					const auto sys = _SyscallEvents32.find(ev->GetNr());
+					if (sys != _SyscallEvents32.end() && sys->second && sys->second->callback((void*) s))
+						_SyscallEvents32.erase(sys);
+				}
+				else
 				{
-					_SyscallEvents64.Call(ev->GetNr(), (void*)s);
+					const auto sys = _SyscallEvents64.find(ev->GetNr());
+					if (sys != _SyscallEvents64.end() && sys->second && sys->second->callback((void*) s))
+						_SyscallEvents64.erase(sys);
 				}
 
 				delete s;
@@ -808,13 +816,17 @@ namespace libvmtrace
 			// 	(static_cast<SyscallJson*>(s))->PostProcess(*this, vcpu, vmi, regs);
 			// }
 
-			if(ev->Is32bit())
+			if (ev->Is32bit())
 			{
-				_SyscallEvents32.Call(ev->GetNr(), (void*)s);
+				const auto sys = _SyscallEvents32.find(ev->GetNr());
+				if (sys != _SyscallEvents32.end() && sys->second && sys->second->callback((void*) s))
+					_SyscallEvents32.erase(sys);
 			}
 			else
 			{
-				_SyscallEvents64.Call(ev->GetNr(), (void*)s);
+				const auto sys = _SyscallEvents64.find(ev->GetNr());
+				if (sys != _SyscallEvents64.end() && sys->second && sys->second->callback((void*) s))
+					_SyscallEvents64.erase(sys);
 			}
 
 			delete s;
@@ -829,7 +841,8 @@ namespace libvmtrace
 	{
 		if (ev.Is32bit())
 		{
-			if (_SyscallEvents32.GetCount(ev.GetNr()) == 1)
+			const auto sys = _SyscallEvents32.find(ev.GetNr());
+			if (sys != _SyscallEvents32.end())
 			{
 				// Remove Breakpoint for this syscall
 				std::map<int, const SyscallBreakpoint>::iterator it;
@@ -838,12 +851,13 @@ namespace libvmtrace
 					_sm->GetBPM()->RemoveBreakpoint(&it->second);
 					_Syscallbps32.erase(ev.GetNr());
 				}
+				_SyscallEvents32.erase(sys);
 			}
-			_SyscallEvents32.DeRegisterEvent(ev.GetNr(), &ev);
 		}
 		else 
 		{
-			if (_SyscallEvents64.GetCount(ev.GetNr()) == 1)
+			const auto sys = _SyscallEvents64.find(ev.GetNr());
+			if (sys != _SyscallEvents64.end())
 			{
 				// Remove Breakpoint for this syscall
 				map<int, const SyscallBreakpoint>::iterator it;
@@ -852,8 +866,8 @@ namespace libvmtrace
 					_sm->GetBPM()->RemoveBreakpoint(&it->second);
 					_Syscallbps64.erase(ev.GetNr());
 				}
+				_SyscallEvents64.erase(sys);
 			}
-			_SyscallEvents64.DeRegisterEvent(ev.GetNr(), &ev);
 		}
 
 		return VMI_SUCCESS;
@@ -866,17 +880,13 @@ namespace libvmtrace
 
 		if (ev.Is32bit())
 		{
-			if(_SyscallEvents32.GetCount(ev.GetNr()) != 0)
-			{
+			if(_SyscallEvents32.find(ev.GetNr()) != _SyscallEvents32.end())
 				return VMI_FAILURE;
-			}
 		}
 		else
 		{
-			if (_SyscallEvents64.GetCount(ev.GetNr()) != 0)
-			{
+			if (_SyscallEvents64.find(ev.GetNr()) != _SyscallEvents64.end())
 				return VMI_FAILURE;
-			}
 		}
 
 		vmi_instance_t vmi = _sm->Lock();
@@ -908,7 +918,7 @@ namespace libvmtrace
 				_Syscallbps32.insert(std::pair<int, const SyscallBreakpoint>(ev.GetNr(), e));
 
 			_sm->GetBPM()->InsertBreakpoint(&(p.first->second));
-			_SyscallEvents32.RegisterEvent(ev.GetNr(), &ev);
+			_SyscallEvents32.insert_or_assign(ev.GetNr(), &ev);
 		}
 		else
 		{
@@ -916,7 +926,7 @@ namespace libvmtrace
 				_Syscallbps64.insert(pair<int, const SyscallBreakpoint>(ev.GetNr(), e));
 
 			_sm->GetBPM()->InsertBreakpoint(&(p.first->second));
-			_SyscallEvents64.RegisterEvent(ev.GetNr(), &ev);
+			_SyscallEvents64.insert_or_assign(ev.GetNr(), &ev);
 		}
 
 		_sm->Unlock();

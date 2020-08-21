@@ -79,7 +79,7 @@ namespace libvmtrace
 				vmi_translate_uv2p(guard.get(), addr, pbp->GetPid(), &addr) != VMI_SUCCESS)
 			throw std::runtime_error("Could not translate breakpoint location.");
 
-		if (!sm->GetInjectionStrategy()->Apply(patch))
+		if (patch && !sm->GetInjectionStrategy()->Apply(patch))
 			throw std::runtime_error("Failed to apply patch!");
 
 		bp.insert_or_assign(addr, breakpoint { patch, ev });
@@ -103,7 +103,7 @@ namespace libvmtrace
 		if (b == bp.end())
 			throw std::runtime_error("Tried to remove breakpoint that is not attached!");
 
-		if (!sm->GetInjectionStrategy()->Undo(b->second.patch))
+		if (b->second.patch && !sm->GetInjectionStrategy()->Undo(b->second.patch))
 			throw std::runtime_error("Failed to undo patch!");
 
 		b->second = { };
@@ -150,27 +150,29 @@ namespace libvmtrace
 				if (!b->second.patch)
 					return 0;
 
-				bpd->bp = b->second;
+				bpd->bp = &b->second;
 				if (b->second.event->callback(bpd))
 				{
-					if (!instance->extended)
-						instance->sm->GetInjectionStrategy()->Undo(b->second.patch);
+					instance->sm->GetInjectionStrategy()->Undo(b->second.patch);
+					b->second.patch = nullptr;
+
 					delete bpd;
 					return 0;
 				}
 			
 				bpd->beforeSingleStep = false;
+				instance->step_events[event->vcpu_id].data = reinterpret_cast<void*>(bpd);
 
-				// TODO: normal single step on syscalls!!
 				if (instance->extended)
 				{
 					event->next_slat_id = bpd->slat_id = event->slat_id;
 					event->slat_id = 0;
-					return VMI_EVENT_RESPONSE_SLAT_ID | VMI_EVENT_RESPONSE_NEXT_SLAT_ID;
+					return VMI_EVENT_RESPONSE_SLAT_ID | ((b->second.event && b->second.event->IsFast()) ?
+							VMI_EVENT_RESPONSE_NEXT_SLAT_ID : // here we get the step event.
+							VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP); // and here we don't.
 				}
 
 				instance->sm->GetInjectionStrategy()->Undo(b->second.patch);
-				instance->step_events[event->vcpu_id].data = reinterpret_cast<void*>(bpd);
 				return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
 			}
 		}
@@ -183,24 +185,27 @@ namespace libvmtrace
 		const auto bpd = reinterpret_cast<BPEventData*>(event->data);
 		auto response = VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
 
-		if (bpd && bpd->bpm) 
+		if (bpd && bpd->bpm && bpd->bp)
 		{
 			const auto bpm = bpd->bpm;
-			const auto remove = dynamic_cast<const SyscallBreakpoint*>(bpd->bp.event)
-				&& bpd->bp.event->callback(bpd);
+			const auto bp = bpd->bp;
+			const auto remove = bp->event && bp->event->callback(bpd);
 
 			// in case we ever want to trap to the monitor on the singlestep.
 			if (bpm->extended)
 			{
 				// remove in the respective view now.
 				if (remove)
-					bpm->sm->GetInjectionStrategy()->Undo(bpd->bp.patch);
+				{
+					bpm->sm->GetInjectionStrategy()->Undo(bp->patch);
+					bp->patch = nullptr;
+				}
 
 				event->slat_id = bpd->slat_id;
 				response |= VMI_EVENT_RESPONSE_SLAT_ID;
 			}
-			else if (!bpm->disabled && bpd->bp.patch && !remove)
-				bpm->sm->GetInjectionStrategy()->Apply(bpd->bp.patch);
+			else if (!bpm->disabled && bp->patch && !remove)
+				bpm->sm->GetInjectionStrategy()->Apply(bp->patch);
 
 			delete bpd;
 			event->data = nullptr;

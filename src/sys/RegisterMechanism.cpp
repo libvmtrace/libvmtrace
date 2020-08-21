@@ -12,11 +12,7 @@ namespace libvmtrace
 		if (!sm->IsEventSupported())
 			throw std::runtime_error("Event not supported");
 
-		LockGuard guard(sm);
-
 		SETUP_REG_EVENT(&register_event, CR3, VMI_REGACCESS_W, false, HandleRegisterEvent);
-		register_event.data = this;
-		vmi_register_event(guard.get(), &register_event);
 	}
 
 	RegisterMechanism::~RegisterMechanism()
@@ -40,21 +36,51 @@ namespace libvmtrace
 
 	void RegisterMechanism::InsertRegisterEvent(const ProcessChangeEvent* ev)
 	{
-		reg_events.RegisterEvent(ev->ev.reg_event.reg, ev);
+		reg_events.push_back(ev);
+		SetRegisterEvent(true);
 	}
 
 	void RegisterMechanism::RemoveRegisterEvent(const ProcessChangeEvent* ev)
 	{
-		reg_events.DeRegisterEvent(ev->ev.reg_event.reg, ev);
+		reg_events.erase(std::remove(reg_events.begin(), reg_events.end(), ev), reg_events.end());
+		if (reg_events.empty()) SetRegisterEvent(false);
 	}
 
-	event_response_t RegisterMechanism::HandleRegisterEvent(vmi_instance_t vmi, vmi_event_t *event)
+	void RegisterMechanism::SetRegisterEvent(const bool value)
+	{
+		LockGuard guard(sm);
+
+		if (!!register_event.data == value)
+			return;
+
+		if (vmi_pause_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to pause VM.");
+
+		if (value)
+		{
+			register_event.data = this;
+			vmi_register_event(guard.get(), &register_event);
+		}
+		else
+		{
+			register_event.data = nullptr;
+			vmi_clear_event(guard.get(), &register_event, nullptr);
+		}
+
+		if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to resume VM.");
+	}
+
+	event_response_t RegisterMechanism::HandleRegisterEvent(vmi_instance_t vmi, vmi_event_t* event)
 	{
 		const auto instance = (RegisterMechanism*) event->data;
-
 		LockGuard guard(instance->sm);
-		instance->reg_events.Call(event->reg_event.reg, event);
-
+		for (auto it = instance->reg_events.begin(); it != instance->reg_events.end();)
+			if (*it && (*it)->callback(event))
+				it = instance->reg_events.erase(it);
+			else
+				it++;
+		std::cout << "reg ev!\n";
 		return 0;
 	}
 }

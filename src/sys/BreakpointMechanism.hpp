@@ -41,7 +41,7 @@ namespace libvmtrace
 	{
 		unsigned int vcpu;
 		x86_registers_t regs;
-		breakpoint bp;
+		breakpoint* bp;
 		uint16_t slat_id;
 		void* raw_event;
 		addr_t paddr;

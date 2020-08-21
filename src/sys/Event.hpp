@@ -74,7 +74,7 @@ namespace libvmtrace
 	class BreakpointEvent : public Event 
 	{
 		public:
-			BreakpointEvent(const std::string name, addr_t addr, EventListener& el): Event(el), _name(name), _addr(addr) {}
+			BreakpointEvent(const std::string name, addr_t addr, EventListener& el, bool fast = false) : Event(el), _name(name), _addr(addr), _fast(fast) {}
 			addr_t  GetAddr () const 
 			{ 
 				return _addr;
@@ -85,10 +85,16 @@ namespace libvmtrace
 				return _name;
 			}
 
+			bool IsFast() const
+			{
+				return _fast;
+			}
+
 		protected:
 			BreakpointEvent();
 			const std::string _name;
 			const addr_t _addr;
+			const bool _fast;
 	};
 
 	enum SyscallType
@@ -121,14 +127,15 @@ namespace libvmtrace
 	class ProcessBreakpointEvent : public BreakpointEvent 
 	{
 		public:
-			ProcessBreakpointEvent(const std::string name, vmi_pid_t pid,addr_t addr,EventListener& el): 
-				BreakpointEvent(name,addr,el),
+			ProcessBreakpointEvent(const std::string name, vmi_pid_t pid,addr_t addr,EventListener& el, bool fast = false) :
+				BreakpointEvent(name,addr,el, fast),
 				_pid(pid) {}
 
 			vmi_pid_t GetPid() const { return _pid; };
 			
 		private:
 			vmi_pid_t _pid; 
+			bool fast;
 	};
 
 	class SyscallBreakpoint : public BreakpointEvent
@@ -163,25 +170,6 @@ namespace libvmtrace
 			bool _is32bit;
 			bool _processJson;
 			SyscallBasic* _syscall;
-	};
-
-	// The EventManager: It manages Event structures and calls EventListeners
-	template<typename U, typename T> class EventManager 
-	{
-		public:
-			EventManager() {};
-			~EventManager() {};
-			void RegisterEvent(U signal, T e);
-			void DeRegisterEvent(U signal, T e);
-			void Call(U signal, void* data);
-			uint64_t GetCount(U signal);
-			void ForEach(void(*f)(T, void*), void* data);
-
-		private:
-			void RemoveEvents();    
-			typedef std::map<U, std::vector<T>> evmap;
-			evmap _Events;
-			std::vector<std::pair<U, T>> _DeleteEvents;
 	};
 }
 

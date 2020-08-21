@@ -157,8 +157,8 @@ namespace libvmtrace
 
 		status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, std::string command, EventListener* evl);
 
-		EventManager<int, const SyscallEvent*> _SyscallEvents64;
-		EventManager<int, const SyscallEvent*> _SyscallEvents32;
+		std::unordered_map<int, const SyscallEvent*> _SyscallEvents64;
+		std::unordered_map<int, const SyscallEvent*> _SyscallEvents32;
 		std::map<int, const SyscallBreakpoint> _Syscallbps64;
 		std::map<int, const SyscallBreakpoint> _Syscallbps32;
 		SyscallProcessor _syscallProc;

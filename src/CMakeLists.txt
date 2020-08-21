@@ -6,7 +6,6 @@ project (vmtrace)
 set (sys_files
 	sys/SystemMonitor.cpp
 	sys/BreakpointMechanism.cpp
-	sys/Event.cpp
 	sys/Process.cpp
 	sys/ElfHelper.cpp
 	sys/OperatingSystem.cpp

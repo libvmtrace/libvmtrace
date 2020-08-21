@@ -110,11 +110,11 @@ namespace libvmtrace
 		bool on_injection(const Event* event, void* data);
 		bool on_cr3_change(const Event* event, void* data);
 		bool on_mmap_break(const Event* event, void* data);
-		bool on_execveat(const Event* event, void* data);
 		bool on_last_chance(const Event* event, void* data);
+		void refresh_child(const vmi_pid_t pid);
 
 		std::unique_ptr<injection_listener> inject_listener, cr3_listener,
-			mmap_listener, execveat_listener, last_chance_listener;
+			mmap_listener, last_chance_listener;
 
 		std::shared_ptr<SystemMonitor> sm;
 		std::shared_ptr<LinuxVM> vm;
@@ -127,9 +127,7 @@ namespace libvmtrace
 		std::vector<uint8_t> stored_bytes{};
 		std::unique_ptr<ProcessChangeEvent> cr3_change;
 		std::unique_ptr<ProcessBreakpointEvent> mmap_break, last_chance_break;
-		std::unique_ptr<SyscallEvent> execveat_call;
 		std::atomic<bool> forked{}, mapped{}, executed{}, finished{};
-		std::chrono::time_point<std::chrono::high_resolution_clock> timer{};
 	};
 }
 
