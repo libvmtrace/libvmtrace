@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 		
 		const auto addr = static_cast<addr_t>(std::stoi(argv[3]));
 		TestListener test_listener{};
-		const auto bp = std::make_unique<ProcessBreakpointEvent>("Test", process->GetPid(), addr, test_listener);
+		const auto bp = std::make_unique<ProcessBreakpointEvent>("Test", process->GetPid(), addr, test_listener, true);
 		sm->GetBPM()->InsertBreakpoint(bp.get());
 
 		std::cout << "Set breakpoint, press any key to undo it!" << std::endl;

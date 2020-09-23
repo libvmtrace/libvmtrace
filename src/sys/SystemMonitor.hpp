@@ -18,6 +18,7 @@ namespace libvmtrace
 {
 	class BreakpointMechanism;
 	class RegisterMechanism;
+	class OperatingSystem;
 
 	class SystemMonitor : public std::enable_shared_from_this<SystemMonitor>
 	{
@@ -75,6 +76,16 @@ namespace libvmtrace
 				return inj;
 			}
 
+			void SetOS(std::shared_ptr<OperatingSystem> os)
+			{
+				this->os = os;
+			}
+
+			std::shared_ptr<OperatingSystem> GetOS() const
+			{
+				return os;
+			}
+
 		private:
 			void ProcessEvents(); 
 
@@ -89,6 +100,7 @@ namespace libvmtrace
 			std::shared_ptr<BreakpointMechanism> bpm;
 			std::shared_ptr<RegisterMechanism> rm;
 			std::shared_ptr<InjectionStrategy> inj;
+			std::shared_ptr<OperatingSystem> os;
 
 			std::vector<addr_t> exclude_addresses;
 

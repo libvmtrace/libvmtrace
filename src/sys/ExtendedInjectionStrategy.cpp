@@ -2,6 +2,7 @@
 #include <sys/CodeInjection.hpp>
 #include <util/LockGuard.hpp>
 #include <libvmi/slat.h>
+#include <numeric>
 
 namespace libvmtrace
 {
@@ -81,35 +82,31 @@ namespace libvmtrace
 		if (!xen)
 			return;
 
-		{
-			LockGuard guard(sm);
-			decommissioned = true;
-		}
-
 		// make sure all rings have been processed.
+		vmi_instance_t vmi;
+		decommissioned = true;
 		for (;;)
 		{
 			{
-				LockGuard guard(sm);
-				if (!vmi_are_events_pending(guard.get()))
+				vmi = sm->Lock();
+				if (!vmi_are_events_pending(vmi))
 					break;
+				sm->Unlock();
 			}
 			std::this_thread::sleep_for(1ms);
 		}
 
-		LockGuard guard(sm);
-
 		// remove event handler.
 		if (coordinated)
-			vmi_clear_event(guard.get(), &scheduler_event, nullptr);
-		vmi_clear_event(guard.get(), &mem_event, nullptr);
+			vmi_clear_event(vmi, &scheduler_event, nullptr);
+		vmi_clear_event(vmi, &mem_event, nullptr);
 
 		// remove all custom views.
-		vmi_slat_switch(guard.get(), 0);
-		vmi_slat_destroy(guard.get(), view_rw);
-		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
-			vmi_slat_destroy(guard.get(), view_x[i]);
-		vmi_slat_set_domain_state(guard.get(), false);
+		vmi_slat_switch(vmi, 0);
+		vmi_slat_destroy(vmi, view_rw);
+		for (auto i = 0; i < vmi_get_num_vcpus(vmi); i++)
+			vmi_slat_destroy(vmi, view_x[i]);
+		vmi_slat_set_domain_state(vmi, false);
 
 		// free our sink page.
 		FreePage(sink_page);
@@ -119,11 +116,16 @@ namespace libvmtrace
 
 		// reset memory.
 		xen->SetMaxMem(init_mem);
+		sm->Unlock();
 	}
 
 	bool ExtendedInjectionStrategy::Apply(std::shared_ptr<Patch> patch)
 	{
 		LockGuard guard(sm);
+
+		// pause the virtual machine.
+		if (vmi_pause_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to pause VM.");
 
 		// lazy initialize.
 		if (!xen)
@@ -136,7 +138,16 @@ namespace libvmtrace
 			addr_t location_pa;
 			if (vmi_translate_uv2p(guard.get(), patch->location, patch->pid, &location_pa) != VMI_SUCCESS)
 				throw std::runtime_error("Failed to translate patch location.");
+			patch->virt = patch->location;
 			patch->location = location_pa;
+		}
+
+		// synchronize the patch with the monitored virtual machine.
+		if (!Synchronize(patch))
+		{
+			if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to resume VM.");
+			return false;
 		}
 
 		// for now every patch must be limited to a single page.
@@ -165,12 +176,28 @@ namespace libvmtrace
 		if (vmi_write_pa(guard.get(), offset, patch->data.size(), patch->data.data(), nullptr) != VMI_SUCCESS)
 			return false;
 
+		// resume the virtual machine.
+		if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to resume VM.");
+
 		return InjectionStrategy::Apply(patch);
 	}
 	
 	bool ExtendedInjectionStrategy::UndoPatch(std::shared_ptr<Patch> patch)
 	{
 		LockGuard guard(sm);
+
+		// pause the virtual machine.
+		if (vmi_pause_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to pause VM.");
+
+		// synchronize the patch with the monitored virtual machine.
+		if (!Synchronize(patch))
+		{
+			if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to resume VM.");
+			return false;
+		}
 
 		const auto shadow_page = UnreferenceShadowPage(addr_to_page(patch->location), patch->vcpu, patch->pid);
 
@@ -182,6 +209,10 @@ namespace libvmtrace
 			if (vmi_write_pa(guard.get(), offset, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
 				return false;
 		}
+
+		// resume the virtual machine.
+		if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to resume VM.");
 		
 		return InjectionStrategy::UndoPatch(patch);
 	}
@@ -344,6 +375,26 @@ namespace libvmtrace
 		}
 
 		return *shadow_page;
+	}
+
+	bool ExtendedInjectionStrategy::Synchronize(std::shared_ptr<Patch> patch)
+	{
+		LockGuard guard(sm);
+		addr_t dtb;
+		if (patch->pid == 0 || vmi_pid_to_dtb(guard.get(), patch->pid, &dtb) != VMI_SUCCESS)
+			return true;
+
+		// check intersection with all task structs.
+		for (const auto& process : sm->GetOS()->GetProcessList())
+			if (process.GetDtb() == dtb)
+			{
+				addr_t location;
+				if (vmi_translate_uv2p(guard.get(), process.GetIP(), process.GetPid(), &location) == VMI_SUCCESS
+					&& location > patch->location && location <= patch->location + patch->data.size())
+					return false;
+			}
+
+		return true;
 	}
 
 	uint64_t ExtendedInjectionStrategy::AllocatePage()

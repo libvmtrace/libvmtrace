@@ -43,12 +43,11 @@ namespace libvmtrace
 					_name(name),
 					_path(path),
 					_parent_pid(parent_pid),
-					_mmaps(NULL)//,
-					//_tcp_connections_(NULL) 
+					_mmaps(NULL)
 					{ }
 
 			Process(addr_t addr, vmi_pid_t pid, addr_t dtb, const std::string& name, const std::string& path,
-					vmi_pid_t parent_pid, int uid, const std::string& pwd) :
+					vmi_pid_t parent_pid, int uid, const std::string& pwd, addr_t ip) :
 					_task_struct(addr),
 					_pid(pid),
 					_dtb(dtb),
@@ -57,8 +56,8 @@ namespace libvmtrace
 					_parent_pid(parent_pid),
 					_uid(uid),
 					_pwd(pwd),
-					_mmaps(NULL)//,
-					//tcp_connections_(NULL) 
+					_mmaps(NULL),
+					_ip(ip)
 					{ }
 
 			vmi_pid_t GetPid() const 
@@ -121,6 +120,11 @@ namespace libvmtrace
 				return _parent_pid; 
 			}
 
+			addr_t GetIP() const
+			{
+				return _ip;
+			}
+
 			std::map<std::string, std::string> GetStringMap();
 			std::map<std::string, int> GetIntMap();
 			rapidjson::Value ToJson(rapidjson::Document::AllocatorType& allocator);
@@ -130,6 +134,7 @@ namespace libvmtrace
 			addr_t _task_struct;
 			vmi_pid_t _pid;
 			addr_t _dtb;
+			addr_t _ip;
 			const std::string _name;
 			const std::string _path;
 			vmi_pid_t _parent_pid;

@@ -48,7 +48,7 @@ namespace libvmtrace
 				: location(location), pid(pid), vcpu(vcpu), data(data) { }
 	
 	private:
-		addr_t location;
+		addr_t location, virt;
 		uint64_t pid;
 		uint64_t vcpu;
 		std::vector<uint8_t> data;
@@ -110,7 +110,7 @@ namespace libvmtrace
 		{
 			return true;
 		}
-	
+
 		std::vector<std::shared_ptr<Patch>> patches{};
 		std::shared_ptr<SystemMonitor> sm;
 	};
@@ -141,6 +141,8 @@ namespace libvmtrace
 
 		ShadowPage ReferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid);
 		ShadowPage UnreferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid);
+
+		bool Synchronize(std::shared_ptr<Patch> patch);
 
 		uint64_t AllocatePage();
 		void FreePage(uint64_t page);

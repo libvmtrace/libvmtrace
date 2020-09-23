@@ -56,8 +56,12 @@ namespace libvmtrace
 	LinuxVM::LinuxVM(std::shared_ptr<SystemMonitor> sm) : OperatingSystem(sm), _syscallProc(this), 
 		_process_change(nullptr), _code_injection_proc_cr3(this), _code_injection_proc_int3(this)
 	{
-		vmi_instance_t vmi = sm->Lock();
+		// dirty trick to prevent shared_from_this from throwing a bad weak ptr.
+		// does this break anything?
+		const auto unused = std::shared_ptr<LinuxVM>(this, [](LinuxVM*){});
+		sm->SetOS(shared_from_this());
 
+		vmi_instance_t vmi = sm->Lock();
 		vmi_get_offset(vmi, (char*)"linux_name", &_name_offset);
 		vmi_get_kernel_struct_offset(vmi,"task_struct", "mm", &_mm_offset);
 		vmi_get_offset(vmi, (char*)"linux_tasks", &_tasks_offset);
@@ -192,8 +196,12 @@ namespace libvmtrace
 		addr_t tmp5;
 		vmi_read_addr_va(vmi, mm+_exe_file_offset, 0, &tmp5);
 		string path = d_path(tmp5 + _f_path_offset, vmi);
-		Process p(current_process, pid, dtb, name, path, parent_pid, uid, pwd);
-		return p;
+
+		addr_t sp0, ip;
+		vmi_read_addr_va(vmi, current_process + _thread_struct_offset + _sp0_offset, 0, &sp0);
+		vmi_read_addr_va(vmi, sp0 + _ip_on_pt_regs_offset - 0xA8, 0, &ip);
+
+		return Process(current_process, pid, dtb, name, path, parent_pid, uid, pwd, ip);
 	}
 
 	vector<Process> LinuxVM::GetProcessList(void)
