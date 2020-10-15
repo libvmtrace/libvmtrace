@@ -70,10 +70,6 @@ namespace libvmtrace
 				throw std::runtime_error("Could not hide x view.");
 			view_x.push_back(view);
 		}
-
-		// make r/w view active.
-		if (!coordinated && vmi_slat_switch(guard.get(), view_rw) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to switch to rw view.");
 	}
 
 	ExtendedInjectionStrategy::~ExtendedInjectionStrategy()
@@ -227,7 +223,7 @@ namespace libvmtrace
 
 		// disable altp2m on other processes.
 		event->slat_id = 0;
-		
+
 		if (!instance->decommissioned &&
 			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
 		{
@@ -380,9 +376,14 @@ namespace libvmtrace
 	bool ExtendedInjectionStrategy::Synchronize(std::shared_ptr<Patch> patch)
 	{
 		LockGuard guard(sm);
+
+		// no synchronization for kernel threads.
 		addr_t dtb;
 		if (patch->pid == 0 || vmi_pid_to_dtb(guard.get(), patch->pid, &dtb) != VMI_SUCCESS)
 			return true;
+
+		// build a list of all intersections.
+		std::vector<addr_t> intersect;
 
 		// check intersection with all task structs.
 		for (const auto& process : sm->GetOS()->GetProcessList())
@@ -391,9 +392,39 @@ namespace libvmtrace
 				addr_t location;
 				if (vmi_translate_uv2p(guard.get(), process.GetIP(), process.GetPid(), &location) == VMI_SUCCESS
 					&& location > patch->location && location <= patch->location + patch->data.size())
-					return false;
+					intersect.push_back(location);
 			}
 
+		// now check all processors.
+		addr_t cmp_dtb;
+		vmi_pid_t cmp_pid;
+		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
+		{
+			if (vmi_get_vcpureg(guard.get(), &cmp_dtb, CR3, i) != VMI_SUCCESS // should never happen.
+				|| vmi_dtb_to_pid(guard.get(), cmp_dtb, &cmp_pid) != VMI_SUCCESS) // missed page-table? try again.
+				return false;
+
+			// only check for intersections on *this* process.
+			if (cmp_pid != patch->pid)
+				continue;
+
+			addr_t location;
+			if (vmi_get_vcpureg(guard.get(), &location, RIP, i) == VMI_SUCCESS)
+			{
+				if (location > patch->location && location <= patch->location + patch->data.size())
+					intersect.push_back(location);
+			}
+			else
+				intersect.push_back(0); // make sure we delay, if required.
+		}
+
+		// if the patch is not relocatable, e.g., it is a breakpoint, delay.
+		if (!patch->relocatable && !intersect.empty())
+			return false;
+
+		// finally, relocate it.
+		for (const auto& inter : intersect)
+			patch->location = std::max(patch->location, inter);
 		return true;
 	}
 

@@ -44,8 +44,8 @@ namespace libvmtrace
 		friend class ExtendedInjectionStrategy;
 
 	public:
-		Patch(addr_t location, uint64_t pid, uint64_t vcpu, std::vector<uint8_t> data)
-				: location(location), pid(pid), vcpu(vcpu), data(data) { }
+		Patch(addr_t location, uint64_t pid, uint64_t vcpu, std::vector<uint8_t> data, bool relocatable = false)
+				: location(location), pid(pid), vcpu(vcpu), data(data), relocatable(relocatable) { }
 	
 	private:
 		addr_t location, virt;
@@ -54,6 +54,9 @@ namespace libvmtrace
 		std::vector<uint8_t> data;
 		std::vector<uint8_t> original;
 		std::vector<std::shared_ptr<Patch>> dependencies;
+
+		// NOTE: this may not be used on breakpoints as it changes the semantics.
+		bool relocatable{};
 	};
 
 	struct ShadowPage
@@ -153,7 +156,7 @@ namespace libvmtrace
 		uint64_t init_mem, last_page, sink_page;
 		uint16_t view_rw;
 		std::vector<uint16_t> view_x;
-		vmi_event_t scheduler_event, mem_event;
+		vmi_event_t scheduler_event{}, mem_event{};
 		bool decommissioned{};
 
 		// paramters for injection.
