@@ -44,8 +44,8 @@ namespace libvmtrace
 		friend class ExtendedInjectionStrategy;
 
 	public:
-		Patch(addr_t location, uint64_t pid, uint64_t vcpu, std::vector<uint8_t> data, bool relocatable = false)
-				: location(location), pid(pid), vcpu(vcpu), data(data), relocatable(relocatable) { }
+		Patch(addr_t location, uint64_t pid, uint64_t vcpu, std::vector<uint8_t> data, bool kernel_space = false, bool relocatable = false)
+				: location(location), pid(pid), vcpu(vcpu), data(data), virt(kernel_space ? ~0ull : 0ull), relocatable(relocatable) { }
 	
 	private:
 		addr_t location, virt;

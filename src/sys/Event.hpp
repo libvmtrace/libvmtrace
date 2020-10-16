@@ -105,31 +105,34 @@ namespace libvmtrace
 	class SyscallEvent : public Event
 	{
 		public:
-			SyscallEvent(int syscallnumber, EventListener& el, bool with_ret, bool is32bit, bool processJson):  
+			SyscallEvent(int syscallnumber, EventListener& el, bool with_ret, bool is32bit, bool processJson, vmi_pid_t pid = 0):  
 				Event(el), 
 				_nr(syscallnumber), 
 				_with_ret(with_ret),
 				_is32bit(is32bit),
-				_processJson(processJson) {}
+				_processJson(processJson),
+				_pid(pid) { }
 
 			inline int GetNr () const { return _nr;};
 			inline bool WithRet() const { return _with_ret; };
 			inline bool Is32bit() const { return _is32bit; };
 			inline bool ProcessJson() const { return _processJson; };
+			inline vmi_pid_t GetPid() const { return _pid; }
 
 		private:
 			const int _nr;
 			const bool _with_ret;
 			const bool _is32bit;
 			const bool _processJson;
+			const vmi_pid_t _pid;
 	};
 
 	class ProcessBreakpointEvent : public BreakpointEvent 
 	{
 		public:
-			ProcessBreakpointEvent(const std::string name, vmi_pid_t pid,addr_t addr,EventListener& el, bool fast = false) :
-				BreakpointEvent(name,addr,el, fast),
-				_pid(pid) {}
+			ProcessBreakpointEvent(const std::string name, vmi_pid_t pid, addr_t addr, EventListener& el, bool fast = false) :
+				BreakpointEvent(name, addr, el, fast),
+				_pid(pid) { }
 
 			vmi_pid_t GetPid() const { return _pid; };
 			
@@ -138,24 +141,26 @@ namespace libvmtrace
 			bool fast;
 	};
 
-	class SyscallBreakpoint : public BreakpointEvent
+	// NOTE: For now we do not support *fast* syscall breakpoints.
+	// Unsure, if there are situations, where this is desirable.
+	class SyscallBreakpoint : public ProcessBreakpointEvent
 	{
 		public:
-			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson):
-								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
+			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, vmi_pid_t pid = 0) :
+								ProcessBreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), pid, addr, el),
 								_nr(nr),
 								_type(type),
 								_is32bit(is32bit),
 								_processJson(processJson),
-								_syscall(nullptr) {}
+								_syscall(nullptr) { }
 
-			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, SyscallBasic* s):
-								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
+			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, SyscallBasic* s, vmi_pid_t pid = 0) :
+								ProcessBreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), pid, addr, el),
 								_nr(nr),
 								_type(type),
 								_is32bit(is32bit),
 								_processJson(processJson),
-								_syscall(s) {}
+								_syscall(s) { }
 
 			~SyscallBreakpoint() {}
 			inline int GetNr() const { return _nr; }

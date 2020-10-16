@@ -70,12 +70,13 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 		auto addr = ev->GetAddr();
+		const auto kernel_space = !!dynamic_cast<const SyscallBreakpoint*>(ev);
 		const auto pbp = dynamic_cast<const ProcessBreakpointEvent*>(ev);
-		const auto patch = std::make_shared<Patch>(addr, pbp ? pbp->GetPid() : 0, ALL_VCPU, std::vector<uint8_t>{ TRAP });
+		const auto patch = std::make_shared<Patch>(addr, pbp ? pbp->GetPid() : 0, ALL_VCPU, std::vector<uint8_t>{ TRAP }, kernel_space);
 
 		// if the breakpoint is inside a process, translate it here,
 		// so that we only use physical addresses for lookup.
-		if (pbp && pbp->GetPid() > 0 &&
+		if (pbp && pbp->GetPid() > 0 && !kernel_space &&
 				vmi_translate_uv2p(guard.get(), addr, pbp->GetPid(), &addr) != VMI_SUCCESS)
 			throw std::runtime_error("Could not translate breakpoint location.");
 
@@ -90,11 +91,12 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 		auto addr = ev->GetAddr();
+		const auto kernel_space = !!dynamic_cast<const SyscallBreakpoint*>(ev);
 		const auto pbp = dynamic_cast<const ProcessBreakpointEvent*>(ev);
 		
 		// if the breakpoint is inside a process, translate it here,
 		// so that we only use physical addresses for lookup.
-		if (pbp && pbp->GetPid() > 0 &&
+		if (pbp && pbp->GetPid() > 0 && !kernel_space &&
 				vmi_translate_uv2p(guard.get(), addr, pbp->GetPid(), &addr) != VMI_SUCCESS)
 			throw std::runtime_error("Could not translate breakpoint location.");
 		

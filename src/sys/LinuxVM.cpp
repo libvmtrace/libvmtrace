@@ -918,7 +918,7 @@ namespace libvmtrace
 			type = BEFORE_CALL;
 		}
 
-		SyscallBreakpoint e(bpaddr, _syscallProc, ev.GetNr(), type, ev.Is32bit(), ev.ProcessJson());
+		SyscallBreakpoint e(bpaddr, _syscallProc, ev.GetNr(), type, ev.Is32bit(), ev.ProcessJson(), ev.GetPid());
 
 		if (ev.Is32bit())
 		{

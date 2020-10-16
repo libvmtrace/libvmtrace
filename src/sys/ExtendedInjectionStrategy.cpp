@@ -129,7 +129,7 @@ namespace libvmtrace
 
 		// if we are trying to apply a patch to virtual memory,
 		// translate it into physical memory first.
-		if (patch->pid != 0)
+		if (patch->pid != 0 && patch->virt != ~0ull)
 		{
 			addr_t location_pa;
 			if (vmi_translate_uv2p(guard.get(), patch->location, patch->pid, &location_pa) != VMI_SUCCESS)
@@ -154,7 +154,7 @@ namespace libvmtrace
 
 		// TODO: we can solve this by dynamically creating a new view for the process / page
 		// combination, but for now we just assume there are not different patches in different processes.
-		if (std::find_if(patches.begin(), patches.end(),
+		if (patch->virt != ~0ull && std::find_if(patches.begin(), patches.end(),
 			[&start_page](std::shared_ptr<Patch>& p) -> bool
 			{ return addr_to_page(p->location) == start_page; }) != patches.end())
 			throw std::runtime_error("EPT patch cannot modify the same page in two processes.");
@@ -312,9 +312,11 @@ namespace libvmtrace
 					throw std::runtime_error("Failed to enable memory events for x view.");
 
 				// activate fast switching.
-				const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
-				if (coordinated && xc_altp2m_add_fast_switch(xc, vmid, vind, dtb, view_rw, view) < 0)
-					throw std::runtime_error("Failed to enable fast switching.");
+				if (coordinated)
+				{
+					const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
+					xc_altp2m_add_fast_switch(xc, vmid, vind, dtb, view_rw, view);
+				}
 			}
 
 			// remap the affected page to sink in r/w view.
@@ -356,9 +358,11 @@ namespace libvmtrace
 				if (vmi_slat_change_gfn(guard.get(), view, shadow_page->read_write, ~addr_t(0)) != VMI_SUCCESS)
 					throw std::runtime_error("Failed to unmap shadow page from EPT.");
 
-				const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
-				if (coordinated && xc_altp2m_remove_fast_switch(xc, vmid, vind, dtb) < 0)
-					throw std::runtime_error("Failed to remove fast switching from process.");
+				if (coordinated)
+				{
+					const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
+					xc_altp2m_remove_fast_switch(xc, vmid, vind, dtb);
+				}
 			}
 
 			// unmap the sink in r/w view.
@@ -379,7 +383,7 @@ namespace libvmtrace
 
 		// no synchronization for kernel threads.
 		addr_t dtb;
-		if (patch->pid == 0 || vmi_pid_to_dtb(guard.get(), patch->pid, &dtb) != VMI_SUCCESS)
+		if (patch->pid == 0 || vmi_pid_to_dtb(guard.get(), patch->pid, &dtb) != VMI_SUCCESS || !sm->GetBPM())
 			return true;
 
 		// build a list of all intersections.

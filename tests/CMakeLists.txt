@@ -15,7 +15,8 @@ set (test_files
 	static_test_extended_injection.cpp
 	static_test_primitive_breakpoint.cpp
 	static_test_extended_breakpoint.cpp
-	memory_test.cpp)
+	memory_test.cpp
+	memory_test_process.cpp)
 
 foreach (test_file ${test_files})
 	string (REPLACE ".cpp" "" final_name ${test_file})
