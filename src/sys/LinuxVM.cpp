@@ -119,20 +119,7 @@ namespace libvmtrace
 		sm->Unlock();
 	}
 
-	LinuxVM::~LinuxVM()
-	{
-		LockGuard guard(_sm);
-
-		for (vector<CodeInjection>::iterator it = _code_injections.begin() ; it != _code_injections.end();)
-		{
-			if ((*it).type == PAGE_FAULT)
-				vmi_write_va(guard.get(), (*it).entry_addr, (*it).target_pid, (*it).instr_size, (*it).saved_code, NULL);
-			else if ((*it).type == FORK_EXEC)
-				vmi_write_va(guard.get(), (*it).breakpoint1, (*it).target_pid, (*it).instr_size, (*it).saved_code, NULL);
-
-			it = _code_injections.erase(it);
-		}
-	}
+	LinuxVM::~LinuxVM() { }
 
 	Process LinuxVM::GetCurrentProcess(addr_t gs_base) const
 	{
@@ -653,7 +640,7 @@ namespace libvmtrace
 		return maps;
 	}
 
-	bool SyscallProcessor::callback(const Event* ev, void* data)
+	bool SyscallProcessor::callback(Event* ev, void* data)
 	{
 		const auto sm = _lvm->GetSystemMonitor();
 		vmi_instance_t vmi = sm->Lock();
@@ -664,7 +651,7 @@ namespace libvmtrace
 		return ret;
 	}
 
-	bool CodeInjectionProcessorInt3::callback(const Event* ev, void* data)
+	bool CodeInjectionProcessorInt3::callback(Event* ev, void* data)
 	{
 		const auto sm = _lvm->GetSystemMonitor();
 
@@ -680,7 +667,7 @@ namespace libvmtrace
 		return ret;
 	}
 
-	bool CodeInjectionProcessorCr3::callback(const Event* ev, void* data)
+	bool CodeInjectionProcessorCr3::callback(Event* ev, void* data)
 	{
 		const auto sm = _lvm->GetSystemMonitor();
 		vmi_instance_t vmi = sm->Lock();
@@ -710,7 +697,7 @@ namespace libvmtrace
 		}
 	}
 
-	bool LinuxVM::ProcessSyscall(const SyscallBreakpoint* ev, void* data, vmi_instance_t vmi)
+	bool LinuxVM::ProcessSyscall(SyscallBreakpoint* ev, void* data, vmi_instance_t vmi)
 	{
 		struct BPEventData* bpd = (struct BPEventData*)data;
 		unsigned int vcpu = bpd->vcpu;
@@ -720,17 +707,16 @@ namespace libvmtrace
 		cout << "Process syscall : " << ev->GetName() << " before single step ? " << bpd->beforeSingleStep << endl;
 #endif
 
-		if(bpd->beforeSingleStep)
-			return false;
-		else
+		// unsure if we still need this with the instruction rewriting.
+		//if (bpd->beforeSingleStep)
+		//	return false;
+
+		if (ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
 		{
-			if(ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
-			{
-				addr_t rip_pa = 0;
-				vmi_translate_kv2p(vmi,regs->rip, &rip_pa);
-				if(_sm->IsExcludeAddress(rip_pa))
-					return false;
-			}
+			addr_t rip_pa = 0;
+			vmi_translate_kv2p(vmi,regs->rip, &rip_pa);
+			if(_sm->IsExcludeAddress(rip_pa))
+				return false;
 		}
 
 		if (ev->GetType() == BEFORE_CALL)
@@ -853,7 +839,7 @@ namespace libvmtrace
 			if (sys != _SyscallEvents32.end())
 			{
 				// Remove Breakpoint for this syscall
-				std::map<int, const SyscallBreakpoint>::iterator it;
+				std::map<int, SyscallBreakpoint>::iterator it;
 				if ((it = _Syscallbps32.find(ev.GetNr())) != _Syscallbps32.end())
 				{
 					_sm->GetBPM()->RemoveBreakpoint(&it->second);
@@ -868,7 +854,7 @@ namespace libvmtrace
 			if (sys != _SyscallEvents64.end())
 			{
 				// Remove Breakpoint for this syscall
-				map<int, const SyscallBreakpoint>::iterator it;
+				map<int, SyscallBreakpoint>::iterator it;
 				if ((it = _Syscallbps64.find(ev.GetNr())) != _Syscallbps64.end())
 				{
 					_sm->GetBPM()->RemoveBreakpoint(&it->second);
@@ -886,7 +872,7 @@ namespace libvmtrace
 		SyscallType type;
 		addr_t bpaddr = 0;
 
-		if (ev.Is32bit())
+		/*if (ev.Is32bit())
 		{
 			if(_SyscallEvents32.find(ev.GetNr()) != _SyscallEvents32.end())
 				return VMI_FAILURE;
@@ -895,7 +881,7 @@ namespace libvmtrace
 		{
 			if (_SyscallEvents64.find(ev.GetNr()) != _SyscallEvents64.end())
 				return VMI_FAILURE;
-		}
+		}*/
 
 		vmi_instance_t vmi = _sm->Lock();
 
@@ -922,7 +908,7 @@ namespace libvmtrace
 
 		if (ev.Is32bit())
 		{
-			pair<std::map<int, const SyscallBreakpoint>::iterator, bool> p =
+			pair<std::map<int, SyscallBreakpoint>::iterator, bool> p =
 				_Syscallbps32.insert(std::pair<int, const SyscallBreakpoint>(ev.GetNr(), e));
 
 			_sm->GetBPM()->InsertBreakpoint(&(p.first->second));
@@ -930,7 +916,7 @@ namespace libvmtrace
 		}
 		else
 		{
-			pair<std::map<int, const SyscallBreakpoint>::iterator, bool> p =
+			pair<std::map<int, SyscallBreakpoint>::iterator, bool> p =
 				_Syscallbps64.insert(pair<int, const SyscallBreakpoint>(ev.GetNr(), e));
 
 			_sm->GetBPM()->InsertBreakpoint(&(p.first->second));
@@ -972,8 +958,6 @@ namespace libvmtrace
 		}
 
 		vmi_translate_kv2p(vmi, sys_call_table, &sys_call_table);
-
-
 
 		if ( vmi_read_64_pa(vmi, sys_call_table + 8 * syscall_nr, &func) != VMI_SUCCESS) 
 		{
@@ -1039,12 +1023,130 @@ namespace libvmtrace
 				".symtab", symbolName.c_str(), onlyFunctions);
 	}
 
-	bool LinuxVM::ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi)
+	bool LinuxVM::ProcessInt3CodeInjection(ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi)
 	{
 		BPEventData* a = (BPEventData*) data;
+		vector<CodeInjection>::iterator inj = std::find_if(_code_injections.begin(), _code_injections.end(),
+			[&ev](CodeInjection& i) { return i.bp && i.bp->GetAddr() == ev->GetAddr();
+				/*&& i.bp->GetPid() == ev->GetPid()*/ });
+		
+		if (inj == _code_injections.end())
+			return false;
+
+		// injection finished, undo all patches.
+		if (inj->recover)
+		{
+			std::cout << "Recover!\n";
+			// pid is stored where rax was saved (+ EFLAGS).
+			vmi_read_64_va(vmi, a->regs.rsp - 2 * sizeof(uint64_t), inj->target_pid, (uint64_t*) &inj->child_pid);
+			
+			// set IP back to the beginning of the patch.
+			vmi_set_vcpureg(vmi, inj->patch->get_virt(), RIP, a->vcpu);
+			
+			// remove ourselves and the patch.
+			_sm->GetBPM()->RemoveBreakpoint(inj->bp.get());
+			_sm->GetInjectionStrategy()->Undo(inj->patch);
+
+			// invoke the callback.
+			inj->evl->callback(ev, &*inj);
+
+			// finally, delete the injection entry.
+			_code_injections.erase(inj);
+		
+			// we already detached us earlier.
+			return false;
+		}
+
+		// injection in progress.
+		std::cout << "Child RAX: " << std::dec << a->regs.rax << std::endl;
+		_sm->GetInjectionStrategy()->NotifyFork(a);
+		reg_t rsp = a->regs.rsp;
+		addr_t orig_addr = rsp;
+		addr_t param1_addr = orig_addr;
+		size_t len = strlen(bin) + 1;
+		param1_addr -= len;
+		//align
+		param1_addr &= ~0x7;
+		size_t buf_len = orig_addr - param1_addr;
+		if(vmi_write_va(vmi, param1_addr, inj->target_pid, buf_len, (void*)bin, NULL) == VMI_FAILURE)
+		{
+			cerr << "could not write the exec filename + argv 1" << endl;
+		}
+		vmi_set_vcpureg(vmi, param1_addr, RDI, a->vcpu); //filename
+		
+#ifdef VMTRACE_DEBUG
+		cout << "exec filename + argv 1 addr : " << hex << param1_addr << endl;
+#endif
+
+		len = strlen(param1) + 1;
+		orig_addr = param1_addr;
+		addr_t param2_addr = orig_addr;
+		param2_addr -= len;
+		//align
+		param2_addr &= ~0x7;
+		buf_len = orig_addr - param2_addr;
+		if(vmi_write_va(vmi, param2_addr, inj->target_pid, buf_len, (void*)param1, NULL) == VMI_FAILURE)
+		{
+			cerr << "could not write the exec argv 2" << endl;
+		}
+
+#ifdef VMTRACE_DEBUG
+		cout << "exec argv 2 addr : " << hex << param2_addr << endl;
+#endif
+
+		len = strlen(inj->command.c_str()) + 1;
+		orig_addr = param2_addr;
+		addr_t param3_addr = orig_addr;
+		param3_addr -= len;
+		//align
+		param3_addr &= ~0x7;
+		buf_len = orig_addr - param3_addr;
+		if(vmi_write_va(vmi, param3_addr, inj->target_pid, buf_len, (void*)inj->command.c_str(), NULL) == VMI_FAILURE)
+		{
+			cerr << "could not write the exec argv 3" << endl;
+		}
+
+#ifdef VMTRACE_DEBUG
+		cout << "exec argv 3 addr : " << hex << param3_addr << endl;
+#endif
+
+		uint64_t null64 = 0;
+		len = 8;
+		orig_addr = param3_addr;
+		addr_t param4_addr = orig_addr;
+		param4_addr -= len;
+		//align
+		param4_addr &= ~0x7;
+		vmi_write_64_va(vmi, param4_addr, inj->target_pid, &null64);
+		vmi_set_vcpureg(vmi, param4_addr, RDX, a->vcpu); //envp
+
+		// populate for argv[]
+		len = 32; //8
+		addr_t addr = param3_addr;
+		addr -= len;
+		addr &= ~0x7;
+
+		vmi_write_64_va(vmi, addr, inj->target_pid, &param1_addr);
+		vmi_write_64_va(vmi, (addr+8), inj->target_pid, &param2_addr);
+		vmi_write_64_va(vmi, (addr+16), inj->target_pid, &param3_addr);
+		vmi_write_64_va(vmi, (addr+24), inj->target_pid, &null64);
+		
+		vmi_set_vcpureg(vmi, addr, RSI, a->vcpu); //argv
+
+#ifdef VMTRACE_DEBUG
+		cout << "argv : " << hex << addr << ", " << (addr+8) << ", " << (addr+16) << ", " << (addr+24) << endl;
+#endif
+
+		addr_t rip = a->regs.rip;
+
+		inj->regs.rsp = a->regs.rsp;
+		inj->recover = true;
+
+		vmi_set_vcpureg(vmi, rip + 1, RIP, a->vcpu);
+		
 		
 		//BP 1 hit -- most likely for page fault
-		vector<CodeInjection>::iterator it2 = find_if(_code_injections.begin(), _code_injections.end(), (boost::bind(&CodeInjection::breakpoint_pa1, _1) == ev->GetAddr()));
+		/*vector<CodeInjection>::iterator it2 = find_if(_code_injections.begin(), _code_injections.end(), (boost::bind(&CodeInjection::breakpoint_pa1, _1) == ev->GetAddr()));
 		if (it2 != _code_injections.end())
 		{
 			//page fault, we recover
@@ -1294,79 +1396,25 @@ namespace libvmtrace
 				_sm->GetRM()->RemoveRegisterEvent(_process_change);
 
 			return true;
-		}
+		}*/
 
-		return true;
+		return false;
 	}
 
 	bool LinuxVM::ProcessCR3CodeInjection(vmi_instance_t vmi, vmi_event_t *event)
 	{
-		vector<CodeInjection>::iterator it3 = find_if(_code_injections.begin(), _code_injections.end(), (boost::bind(&CodeInjection::target_dtb, _1) == event->reg_event.value));
+		vector<CodeInjection>::iterator it3 = find_if(_code_injections.begin(), _code_injections.end(),
+				(boost::bind(&CodeInjection::target_dtb, _1) == event->reg_event.value));
+
+		if (it3 == _code_injections.end())
+			return false;
 
 		// needed if there are more than 2
 		vmi_v2pcache_flush(vmi, ~0ull);
 
-		// TODO: temporary fix for shared libraries until we have
-		// the injection strategies and EPTP switching ready.
-		if (it3 == _code_injections.end())
-		{
-			// determine process identifier.
-			// suppress these warnings, they are not a bug.
-			fflush(stdout);
-			int fd = dup(fileno(stdout));
-			int nullfd = open("/dev/null", O_WRONLY);
-			dup2(nullfd, fileno(stdout));
-			close(nullfd);
-			vmi_pid_t pid = 0;
-			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid);
-			fflush(stdout);
-			dup2(fd, fileno(stdout));
-			close(fd);
-
-			if (_last_code_injection && _last_code_injection->saved_code && pid != _last_code_injection->target_pid)
-			{
-				vmi_write_va(vmi, (_last_code_injection->type == FORK_EXEC ?
-							_last_code_injection->breakpoint1 :
-							_last_code_injection->entry_addr),
-						_last_code_injection->target_pid,
-						_last_code_injection->instr_size,
-						_last_code_injection->saved_code,
-						nullptr);
-				_last_code_injection = nullptr;
-			}
-
-			return false;
-		}
-		else if (it3->saved_code)
-		{
-			if (!_last_code_injection)
-			{
-				switch (it3->type)
-				{
-					case PAGE_FAULT:
-						vmi_write_va(vmi, it3->entry_addr, it3->target_pid,
-								it3->instr_size, it3->inject_code, nullptr);
-						break;
-					case FORK_EXEC:
-						vmi_write_va(vmi, it3->breakpoint1, it3->target_pid,
-								it3->instr_size, code_syscall_vfork_exec, nullptr);
-						break;
-				}
-
-				_last_code_injection = &*it3;
-			}
-
-			return false;
-		}
-
-		const auto type = it3->type;
-		_last_code_injection = &*it3;
-		vmi_pid_t pid = (*it3).target_pid;
-		addr_t task = (*it3).task_struct;
-
-		//https://stackoverflow.com/questions/25253231/context-of-linux-kernel-threads
+		// https://stackoverflow.com/questions/25253231/context-of-linux-kernel-threads
 		addr_t sp0 = 0;
-		vmi_read_addr_va(vmi, task + _thread_struct_offset + _sp0_offset, 0, &sp0);
+		vmi_read_addr_va(vmi, it3->task_struct + _thread_struct_offset + _sp0_offset, 0, &sp0);
 
 		/* README
 		* arch/x86/include/asm/processor.h  - line 927
@@ -1377,17 +1425,14 @@ namespace libvmtrace
 		* sizeof(struct pt_regs) = 168 (0xa8) rather than -1 from tsk.thread.sp0.
 		*
 		*/
-		addr_t ptr_pt_regs = (sp0-0xa8);
 		addr_t pt_regs_ip;
+		vmi_read_addr_va(vmi, sp0 - 0xA8 + _ip_on_pt_regs_offset, 0, &pt_regs_ip);
 
-		//find the next instruction address that about to be executed
-		vmi_read_addr_va(vmi, ptr_pt_regs + _ip_on_pt_regs_offset, 0, &pt_regs_ip);
-
-		switch (type)
+		switch (it3->type)
 		{
 		case PAGE_FAULT:
 		{
-			(*it3).entry_addr = pt_regs_ip;
+			/*(*it3).entry_addr = pt_regs_ip;
 
 			(*it3).saved_code = new char[(*it3).instr_size];
 			(*it3).breakpoint1 = pt_regs_ip + (*it3).instr_size;
@@ -1438,83 +1483,20 @@ namespace libvmtrace
 
 			delete[] tmp;
 #endif
-			(*it3).start1 = std::chrono::high_resolution_clock::now();
+			(*it3).start1 = std::chrono::high_resolution_clock::now();*/
+			throw std::runtime_error("Not implemented!"); // TODO:
 			break;
 		}
 		case FORK_EXEC:
 		{
-			(*it3).saved_code = new char[(*it3).instr_size];
-
-			(*it3).breakpoint1 = pt_regs_ip;
-			addr_t breakpoint_pa = 0;
-			vmi_translate_uv2p(vmi, (*it3).breakpoint1, pid, &breakpoint_pa);
-			(*it3).breakpoint_pa1 = breakpoint_pa;
-
-			(*it3).breakpoint2 = (*it3).breakpoint1 + 0x1F;
-			vmi_translate_uv2p(vmi, (*it3).breakpoint2, pid, &breakpoint_pa);
-			(*it3).breakpoint_pa2 = breakpoint_pa;
-
-			(*it3).breakpoint3 = (*it3).breakpoint3;
-			(*it3).breakpoint_pa3 = (*it3).breakpoint_pa2;
-
-#ifdef VMTRACE_DEBUG
-			cout << hex << "VFORK EXEC BP 1 : " << (*it3).breakpoint1 << " = " << (*it3).breakpoint_pa1 << endl;
-			cout << hex << "VFORK EXEC BP 2 : " << (*it3).breakpoint2 << " = " << (*it3).breakpoint_pa2 << endl;
-#endif
-
-			if((*it3).breakpoint_pa1 == 0 || (*it3).breakpoint_pa2 == 0)
-			{
-				delete[] (*it3).saved_code;
-
-				_code_injections.erase(it3);
-				cerr << "fail PA - VFORK_EXEC" << endl;
-
-				return true;
-			}
-
-			if(vmi_read_va(vmi, (*it3).breakpoint1, pid, (*it3).instr_size, (*it3).saved_code, NULL) == VMI_FAILURE)
-			{
-				_code_injections.erase(it3);
-				cerr << "unable to read original instruction - VFORK_EXEC" << endl;
-
-				return true;
-			}
-
-			// (*it3).bp1 = new ProcessBreakpointEvent("VFORK EXEC 1", 0, (*it3).breakpoint_pa1, _code_injection_proc_int3);
-			// _sm->GetBPM()->InsertBreakpoint((*it3).bp1);
-
-			(*it3).bp1 = new ProcessBreakpointEvent("VFORK EXEC 1", 0, (*it3).breakpoint_pa2, _code_injection_proc_int3);
-			_sm->GetBPM()->InsertBreakpoint((*it3).bp1);
-
-			vmi_write_va(vmi, (*it3).breakpoint1, pid, (*it3).instr_size, code_syscall_vfork_exec, NULL);
-			// vmi_write_va(vmi, (*it3).breakpoint2 + 1, pid, 2, code_syscall, NULL);
-
-			// char* tmp = new char[5];
-			// vmi_read_va(vmi, (*it3).breakpoint1 + 1, pid, 5, tmp, NULL);
-			// cout << hexdumptostring(tmp, 5) << endl;
-
-			// delete[] tmp;
-
-#ifdef VMTRACE_DEBUG
-			addr_t code_paddr = 0;
-			vmi_translate_uv2p(vmi, (*it3).breakpoint1, pid, &code_paddr);
-
-			cout << "\tWrite the injected instruction to PA : " << hex << code_paddr << endl;
-			cout << "code" << endl;
-			cout << hexdumptostring(code_syscall_vfork_exec, (*it3).instr_size) << endl;
-
-			cout << "old inst" << endl;
-			cout << hexdumptostring((*it3).saved_code, (*it3).instr_size) << endl;
-
-			cout << "new inst" << endl;
-			char* tmp = new char[(*it3).instr_size];
-			vmi_read_va(vmi, (*it3).breakpoint1, pid, (*it3).instr_size, tmp, NULL);
-			cout << hexdumptostring(tmp, (*it3).instr_size) << endl;
-
-			delete[] tmp;
-#endif
-			(*it3).start1 = std::chrono::high_resolution_clock::now();
-			break;
+			it3->patch = std::make_shared<Patch>(pt_regs_ip, it3->target_pid, ALL_VCPU, // TODO: vcpu
+					std::vector<uint8_t>(code_syscall_vfork_exec, code_syscall_vfork_exec + it3->instr_size));
+			if (!_sm->GetInjectionStrategy()->Apply(it3->patch))
+				throw std::runtime_error("Failed to inject vfork shellcode.");
+			// TODO: vcpu ???
+			it3->bp = std::make_shared<ProcessBreakpointEvent>("VFORK EXEC", it3->target_pid, pt_regs_ip + 0x1F, _code_injection_proc_int3);
+			_sm->GetBPM()->InsertBreakpoint(it3->bp.get());
+			return true;
 		}
 		default:
 			throw std::runtime_error("Unmatched injection type.");

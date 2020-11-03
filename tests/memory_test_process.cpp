@@ -33,9 +33,9 @@ class TestListener : public EventListener
 		// TestListener(){}
 		TestListener(Log& log):_log(log){}
 		
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				time_t currentTime = chrono::system_clock::now().time_since_epoch() / chrono::milliseconds(1);
@@ -46,13 +46,13 @@ class TestListener : public EventListener
 				_log.log("test", "test", s->ToJson());
 			}
 
-			/*const auto sys = reinterpret_cast<SyscallBasic*>(data);
+			const auto sys = reinterpret_cast<SyscallBasic*>(data);
 			if (sys)
 			{
 				const auto vmi = sm->Lock();
 				std::cout << "Got syscall from " << std::dec << sys->GetPid(vmi) << std::endl;
 				sm->Unlock();
-			}*/
+			}
 			return false;
 		}
 	private:
@@ -107,6 +107,7 @@ int main(int argc, char* argv[])
 	vector<SyscallEvent> events;
 
 	for(int i = 1 ; i <= 300 ; i++)
+	//for (int i = 1; i <= 1; i++)
 	{
 		SyscallEvent s(i, *testListener, false, false, true, static_cast<vmi_pid_t>(std::stoi(argv[2])));
 		vm->RegisterSyscall(s);
@@ -128,6 +129,7 @@ int main(int argc, char* argv[])
 
 	cout << "ready" << endl;
 	for (;;) { /* nothing */ }
+	delete testListener;
 
 	return 0;
 }

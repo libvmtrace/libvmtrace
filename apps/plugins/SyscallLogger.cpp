@@ -52,7 +52,7 @@ namespace libvmtrace
 		return "";
 	}
 
-	bool SyscallLogger::callback(const Event* ev, void* data)
+	bool SyscallLogger::callback(Event* ev, void* data)
 	{
 		const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
 

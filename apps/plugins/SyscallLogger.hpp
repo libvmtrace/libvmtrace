@@ -43,7 +43,7 @@ namespace libvmtrace
 				std::cout << "STOP" << std::endl;
 			}
 
-			bool callback(const Event* ev, void* data);
+			bool callback(Event* ev, void* data);
 
 		private:
 			std::string _vm_id;

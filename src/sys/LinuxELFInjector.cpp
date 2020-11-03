@@ -17,13 +17,13 @@ namespace libvmtrace
 	{
 		LockGuard guard(sm);
 
-		inject_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_injection,
+		inject_listener = std::make_unique<injection_listener>(std::bind(&LinuxELFInjector::on_injection,
 					this, std::placeholders::_1, std::placeholders::_2));
-		cr3_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_cr3_change,
+		cr3_listener = std::make_unique<injection_listener>(std::bind(&LinuxELFInjector::on_cr3_change,
 					this, std::placeholders::_1, std::placeholders::_2));
-		mmap_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_mmap_break,
+		mmap_listener = std::make_unique<injection_listener>(std::bind(&LinuxELFInjector::on_mmap_break,
 					this, std::placeholders::_1, std::placeholders::_2));
-		last_chance_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_last_chance,
+		last_chance_listener = std::make_unique<injection_listener>(std::bind(&LinuxELFInjector::on_last_chance,
 					this, std::placeholders::_1, std::placeholders::_2));
 
 		vmi_get_kernel_struct_offset(guard.get(), "task_struct", "thread", &offsets.thread_struct);
@@ -39,7 +39,7 @@ namespace libvmtrace
 		this->executable = executable;
 
 		// invoke process fork.
-		vm->InvokeCommand(parent.GetPid(), "while true; do sleep 5; done", inject_listener.get());
+		vm->InvokeCommand(parent.GetPid(), /*"while true; do sleep 5; done"*/"echo asd", inject_listener.get());
 		
 		// this should be a mutex + condition variable instead, but meh.
 		do { std::this_thread::sleep_for(4ms); } while(!finished);
@@ -50,14 +50,20 @@ namespace libvmtrace
 		vmi_pidcache_flush(guard.get());
 
 		// return pid.
+		return Process(0, 0, 0, "", "", 0);
 		return *child;
 	}
 
 	bool LinuxELFInjector::on_injection(const Event* event, void* data)
 	{
 		// store off child process.
+		std::cout << "PID: " << std::dec << ((CodeInjection*) data)->child_pid << std::endl;
 		refresh_child(((CodeInjection*) data)->child_pid);
 		forked = true;
+
+		// TODO:
+		finished = true;
+		return true;
 
 		// set a callback for the context switch back to the usermode process.
 		cr3_change = std::make_unique<ProcessChangeEvent>(*cr3_listener);
@@ -266,11 +272,6 @@ namespace libvmtrace
 		if (result == plist.end())
 			throw std::runtime_error("Failed to find process.");
 		child = std::make_unique<Process>(*result);
-	}
-
-	bool LinuxELFInjector::injection_listener::callback(const Event* event, void* data)
-	{
-		return fn(event, data);
 	}
 }
 

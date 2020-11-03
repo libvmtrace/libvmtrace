@@ -17,8 +17,8 @@ std::unique_ptr<LinuxFileExtractor> extractor;
 void shutdown(int sig)
 {
 	extractor = nullptr;
-	sm = nullptr;
 	vm = nullptr;
+	sm = nullptr;
 
 	exit(sig);
 }
@@ -57,7 +57,7 @@ int main(int argc, char** argv)
 	}
 
 	// create vmtrace wrapper objects.
-	sm = std::make_shared<SystemMonitor>(argv[1], true);
+	sm = std::make_shared<SystemMonitor>(argv[1], true, true);
 
 	// initialize vmtrace and delegate.
 	try
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);
 		const auto child = vm->InjectELF(*process, agent);
-		const auto should_skip = true;
+		/*const auto should_skip = true;
 		extractor = std::make_unique<LinuxFileExtractor>(sm, vm, child, agent, should_skip);
 		
 		// helper lambda to wrap extraction and status indicator of file download.
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
 
 		// extract target file.
 		read_file("./file");
-		std::cout << "File successfully extracted." << std::endl;
+		std::cout << "File successfully extracted." << std::endl;*/
 	}
 	catch (const std::exception& e)
 	{

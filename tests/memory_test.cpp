@@ -34,9 +34,9 @@ class TestListener : public EventListener
 		// TestListener(){}
 		TestListener(Log& log):_log(log){}
 		
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				time_t currentTime = chrono::system_clock::now().time_since_epoch() / chrono::milliseconds(1);

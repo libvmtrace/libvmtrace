@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <memory>
 #include <iostream>
+#include <functional>
 #include <assert.h>
 
 #include <libvmi/libvmi.h>
@@ -22,7 +23,22 @@ namespace libvmtrace
 	class EventListener 
 	{
 		public:
-			virtual bool callback(const Event* ev, void* data) = 0;
+			virtual bool callback(Event* ev, void* data) = 0;
+	};
+	
+	using callback_fn = std::function<bool(Event*, void*)>;
+
+	class injection_listener : public EventListener
+	{
+	public:
+		injection_listener(callback_fn fn) : fn(fn) { };
+		bool callback(Event* event, void* data) final
+		{
+			return fn(event, data);
+		}
+
+	private:
+		callback_fn fn;
 	};
 
 	// A very abstract Event class
@@ -31,11 +47,13 @@ namespace libvmtrace
 		public:
 			Event(EventListener& el) : _el(el) {}
 
-			virtual bool callback(void* data) const  
+			virtual bool callback(void* data) 
 			{
 				return _el.callback(this, data);
 			}
 			virtual ~Event() {};
+
+			event_response_t response{};
 
 		private:
 			EventListener& _el;

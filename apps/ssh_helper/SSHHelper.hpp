@@ -55,7 +55,7 @@ namespace helpers
 	class PageFaultListener : public libvmtrace::EventListener
 	{
 		public:
-			bool callback(const libvmtrace::Event* ev, void* data)
+			bool callback(libvmtrace::Event* ev, void* data)
 			{
 				return true;
 			}

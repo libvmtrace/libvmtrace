@@ -10,7 +10,8 @@ namespace libvmtrace
 	struct breakpoint
 	{
 		std::shared_ptr<Patch> patch;
-		const BreakpointEvent* event;
+		BreakpointEvent* event;
+		bool nop;
 	};
 
 	class BreakpointMechanism
@@ -20,8 +21,8 @@ namespace libvmtrace
 		public:
 			BreakpointMechanism(std::shared_ptr<SystemMonitor> sm);
 			~BreakpointMechanism();
-			status_t InsertBreakpoint(const BreakpointEvent* ev);
-			status_t RemoveBreakpoint(const BreakpointEvent* ev);
+			status_t InsertBreakpoint(BreakpointEvent* ev);
+			status_t RemoveBreakpoint(BreakpointEvent* ev);
 
 			void Disable();
 			void Enable();

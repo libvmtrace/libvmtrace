@@ -66,7 +66,7 @@ namespace libvmtrace
 		sm->Unlock();
 	}
 
-	status_t BreakpointMechanism::InsertBreakpoint(const BreakpointEvent* ev)
+	status_t BreakpointMechanism::InsertBreakpoint(BreakpointEvent* ev)
 	{
 		LockGuard guard(sm);
 		auto addr = ev->GetAddr();
@@ -87,7 +87,7 @@ namespace libvmtrace
 		return VMI_SUCCESS;
 	}
 
-	status_t BreakpointMechanism::RemoveBreakpoint(const BreakpointEvent* ev)
+	status_t BreakpointMechanism::RemoveBreakpoint(BreakpointEvent* ev)
 	{
 		LockGuard guard(sm);
 		auto addr = ev->GetAddr();

@@ -13,6 +13,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 #include <sys/Xen.hpp>
+#include <sys/Event.hpp>
 
 // this is needed so that the function signatures are not mangled,
 // so that ldd can link against libxenctrl.so without problems.
@@ -36,6 +37,7 @@ namespace libvmtrace
 	}
 
 	class SystemMonitor;
+	class BPEventData;
 
 	class Patch
 	{
@@ -46,7 +48,9 @@ namespace libvmtrace
 	public:
 		Patch(addr_t location, uint64_t pid, uint64_t vcpu, std::vector<uint8_t> data, bool kernel_space = false, bool relocatable = false)
 				: location(location), pid(pid), vcpu(vcpu), data(data), virt(kernel_space ? ~0ull : 0ull), relocatable(relocatable) { }
-	
+
+		inline addr_t get_virt() const { return virt; }
+
 	private:
 		addr_t location, virt;
 		uint64_t pid;
@@ -108,6 +112,8 @@ namespace libvmtrace
 			return !result & UndoPatch(patch);
 		}
 
+		virtual void NotifyFork(const BPEventData* data) { }
+
 	protected:
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch)
 		{
@@ -134,12 +140,13 @@ namespace libvmtrace
 		ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm);
 		virtual ~ExtendedInjectionStrategy() override;
 		virtual bool Apply(std::shared_ptr<Patch> patch) override;
+		virtual void NotifyFork(const BPEventData* data) override;
 	
 	private:
 		void Initialize();
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch) override;
 
-		static event_response_t HandleSchedulerEvent(vmi_instance_t vmi, vmi_event_t* event);
+		bool HandleSchedulerEvent(Event* event, void* data);
 		static event_response_t HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event);
 
 		ShadowPage ReferenceShadowPage(addr_t page, uint16_t vcpu, vmi_pid_t pid);
@@ -156,7 +163,9 @@ namespace libvmtrace
 		uint64_t init_mem, last_page, sink_page;
 		uint16_t view_rw;
 		std::vector<uint16_t> view_x;
-		vmi_event_t scheduler_event{}, mem_event{};
+		std::unique_ptr<injection_listener> cr3_listener;
+		std::unique_ptr<ProcessChangeEvent> cr3_change;
+		vmi_event_t mem_event{};
 		bool decommissioned{};
 
 		// paramters for injection.

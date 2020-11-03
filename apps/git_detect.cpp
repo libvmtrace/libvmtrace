@@ -100,9 +100,9 @@ static void close_handler(int sig)
 class CloneListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				// cout << "called" << endl;
@@ -169,9 +169,9 @@ CloneListener* cloneListener;
 class BuffGetU8Listener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;
@@ -490,9 +490,9 @@ BuffGetU8Listener* buffGetU8Listener;
 class PacketSend2WrappedListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;

@@ -88,20 +88,6 @@ namespace libvmtrace
 			uint32_t execveat_index = 322;
 		} offsets;
 	
-		using callback_fn = std::function<bool(const Event*, void*)>;
-
-		class injection_listener : public EventListener
-		{
-		public:
-			injection_listener(LinuxELFInjector& parent, callback_fn fn)
-				: parent(parent), fn(fn) { };
-			bool callback(const Event* event, void* data) final;
-
-		private:
-			LinuxELFInjector& parent;
-			callback_fn fn;
-		};
-
 	public:
 		LinuxELFInjector(std::shared_ptr<SystemMonitor> sm, std::shared_ptr<LinuxVM> vm, Process parent);
 		Process inject_executable(std::shared_ptr<std::vector<uint8_t>> executable);

@@ -32,7 +32,7 @@ static void close_handler(int sig)
 class TestListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data) final
 		{
 			// CodeInjection* ci = (CodeInjection*) data;
 			// auto end = std::chrono::high_resolution_clock::now();

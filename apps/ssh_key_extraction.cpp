@@ -62,7 +62,7 @@ addr_t ssh_addr = 0;
 class SSHDoAuthentication : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
 			BPEventData* a = (BPEventData*) data;
 			if(a->beforeSingleStep)
@@ -110,9 +110,9 @@ SSHDoAuthentication* sshDoAuthentication;
 class KexDerivedStart : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;

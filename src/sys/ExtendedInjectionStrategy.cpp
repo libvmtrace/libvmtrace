@@ -11,9 +11,14 @@ namespace libvmtrace
 
 	ExtendedInjectionStrategy::ExtendedInjectionStrategy(std::shared_ptr<SystemMonitor> sm) : InjectionStrategy(sm)
 	{
-		// we need to do a lazy initialize on the first use,
-		// because at this point VMI is not ready yet,
-		// but we need to create the sink page.
+		// setup scheduler events.
+		if (coordinated)
+			return;
+		
+		cr3_listener = std::make_unique<injection_listener>(
+				std::bind(&ExtendedInjectionStrategy::HandleSchedulerEvent, this, std::placeholders::_1, std::placeholders::_2));
+		cr3_change = std::make_unique<ProcessChangeEvent>(*cr3_listener);
+		sm->GetRM()->InsertRegisterEvent(cr3_change.get());
 	}
 
 	void ExtendedInjectionStrategy::Initialize()
@@ -25,14 +30,6 @@ namespace libvmtrace
 
 		// enable altp2m support.
 		EnableAltp2m();
-
-		// setup scheduler events.
-		if (!coordinated)
-		{
-			SETUP_REG_EVENT(&scheduler_event, CR3, VMI_REGACCESS_W, false, HandleSchedulerEvent);
-			scheduler_event.data = this;
-			vmi_register_event(guard.get(), &scheduler_event);
-		}
 
 		// we need to register the memory event even on coordinated injection,
 		// because vmi_set_mem_event has a sanity check that prevents us from setting
@@ -93,8 +90,8 @@ namespace libvmtrace
 		}
 
 		// remove event handler.
-		if (coordinated)
-			vmi_clear_event(vmi, &scheduler_event, nullptr);
+		if (!coordinated)
+			sm->GetRM()->RemoveRegisterEvent(cr3_change.get());
 		vmi_clear_event(vmi, &mem_event, nullptr);
 
 		// remove all custom views.
@@ -155,8 +152,8 @@ namespace libvmtrace
 		// TODO: we can solve this by dynamically creating a new view for the process / page
 		// combination, but for now we just assume there are not different patches in different processes.
 		if (patch->virt != ~0ull && std::find_if(patches.begin(), patches.end(),
-			[&start_page](std::shared_ptr<Patch>& p) -> bool
-			{ return addr_to_page(p->location) == start_page; }) != patches.end())
+			[&start_page, &patch](std::shared_ptr<Patch>& p) -> bool
+			{ return addr_to_page(p->location) == start_page && p->pid != patch->pid; }) != patches.end())
 			throw std::runtime_error("EPT patch cannot modify the same page in two processes.");
 
 		// figure out where to place our patch within the shadow page.
@@ -177,6 +174,35 @@ namespace libvmtrace
 			throw std::runtime_error("Failed to resume VM.");
 
 		return InjectionStrategy::Apply(patch);
+	}
+	
+	void ExtendedInjectionStrategy::NotifyFork(const BPEventData* data)
+	{
+		LockGuard guard(sm);
+
+		return;
+		/*for (auto& patch : patches)
+		{
+			page_info_t info;
+			if (vmi_pagetable_lookup_extended(guard.get(), data->regs.cr3 & ~0x1FFFull,
+						patch->location, &info) == VMI_SUCCESS)
+			{
+				
+			std::cout << "FORK 0x" << std::hex << addr_to_page(info.paddr) << std::endl;
+			}
+			else
+				std::cerr << "FAIL!\n";
+		}*/
+		
+
+		for (auto& shadow_page : shadow_pages)
+		{	
+		uint8_t buffer[PAGE_SIZE];
+		if (vmi_read_pa(guard.get(), page_to_addr(shadow_page.execute), PAGE_SIZE, &buffer, nullptr) != VMI_SUCCESS)
+			throw std::runtime_error("Could not read old page contents.");
+		if (vmi_write_pa(guard.get(), page_to_addr(shadow_page.read_write), PAGE_SIZE, &buffer, nullptr) != VMI_SUCCESS)
+			throw std::runtime_error("Could not write shadow page contents.");
+		}
 	}
 	
 	bool ExtendedInjectionStrategy::UndoPatch(std::shared_ptr<Patch> patch)
@@ -213,28 +239,34 @@ namespace libvmtrace
 		return InjectionStrategy::UndoPatch(patch);
 	}
 	
-	event_response_t ExtendedInjectionStrategy::HandleSchedulerEvent(vmi_instance_t vmi, vmi_event_t* event)
+	bool ExtendedInjectionStrategy::HandleSchedulerEvent(Event* ev, void* data)
 	{
-		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
+		const auto event = reinterpret_cast<vmi_event_t* const>(data);
 		vmi_pid_t pid;
 
-		if (instance->coordinated)
-			return 0;
+		if (coordinated)
+			return true;
 
+		if (view_x.size() > event->vcpu_id)
+			event->slat_id = view_x[event->vcpu_id];
+		ev->response |= VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+		return false;
 		// disable altp2m on other processes.
+		LockGuard guard(sm);
 		event->slat_id = 0;
 
-		if (!instance->decommissioned &&
-			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
+		if (!decommissioned &&
+			vmi_dtb_to_pid(guard.get(), event->reg_event.value, &pid) == VMI_SUCCESS)
 		{
-			auto patch = std::find_if(instance->patches.begin(), instance->patches.end(),
+			auto patch = std::find_if(patches.begin(), patches.end(),
 				[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid; });
 
-			if (patch != instance->patches.end())
-				event->slat_id = instance->view_x[event->vcpu_id];
+			if (patch != patches.end())
+				event->slat_id = view_x[event->vcpu_id];
 		}
-
-		return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+		
+		ev->response |= VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+		return false;
 	}
 	
 	event_response_t ExtendedInjectionStrategy::HandleMemEvent(vmi_instance_t vmi, vmi_event_t* event)
@@ -262,7 +294,7 @@ namespace libvmtrace
 		{
 			if (instance->hide && xc_altp2m_set_visibility(instance->xc, instance->vmid, target_x, false) < 0)
 				throw std::runtime_error("Could not hide x view.");
-			event->slat_id = instance->view_rw;
+			event->slat_id = instance->view_rw;	
 			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 		}
 
@@ -321,7 +353,7 @@ namespace libvmtrace
 
 			// remap the affected page to sink in r/w view.
 			if (vmi_slat_change_gfn(guard.get(), view_rw, shadow_page->execute, sink_page) != VMI_SUCCESS)
-					throw std::runtime_error("Failed to map shadow page into EPT.");
+				throw std::runtime_error("Failed to map shadow page into EPT.");
 			
 			// finally, enable events on the r/w view.
 			if (vmi_set_mem_event(guard.get(), shadow_page->read_write, VMI_MEMACCESS_X, view_rw) != VMI_SUCCESS

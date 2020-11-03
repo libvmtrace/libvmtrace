@@ -34,13 +34,13 @@ namespace libvmtrace
 		sm->Unlock();
 	}
 
-	void RegisterMechanism::InsertRegisterEvent(const ProcessChangeEvent* ev)
+	void RegisterMechanism::InsertRegisterEvent(ProcessChangeEvent* ev)
 	{
 		reg_events.push_back(ev);
 		SetRegisterEvent(true);
 	}
 
-	void RegisterMechanism::RemoveRegisterEvent(const ProcessChangeEvent* ev)
+	void RegisterMechanism::RemoveRegisterEvent(ProcessChangeEvent* ev)
 	{
 		reg_events.erase(std::remove(reg_events.begin(), reg_events.end(), ev), reg_events.end());
 		if (reg_events.empty()) SetRegisterEvent(false);
@@ -75,13 +75,25 @@ namespace libvmtrace
 	{
 		const auto instance = (RegisterMechanism*) event->data;
 		LockGuard guard(instance->sm);
+		auto ret = 0u;
+
 		for (auto it = instance->reg_events.begin(); it != instance->reg_events.end();)
-			if (*it && (*it)->callback(event))
-				it = instance->reg_events.erase(it);
+			if (*it)
+			{
+				(*it)->response = ret;
+				const auto r = (*it)->callback(event);
+				ret = (*it)->response;
+				
+				if (r)
+					it = instance->reg_events.erase(it);
+				else
+					it++;
+			}
 			else
 				it++;
-		std::cout << "reg ev!\n";
-		return 0;
+		
+		if (instance->reg_events.empty()) instance->SetRegisterEvent(false);
+		return ret;
 	}
 }
 

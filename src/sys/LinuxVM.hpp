@@ -42,6 +42,10 @@ namespace libvmtrace
 		char* inject_code = nullptr;
 		char* tmp = nullptr;
 
+		std::shared_ptr<Patch> patch;
+		std::shared_ptr<ProcessBreakpointEvent> bp;
+		bool recover{};
+
 		size_t instr_size;
 		size_t total_page_text;
 
@@ -71,7 +75,7 @@ namespace libvmtrace
 	{
 		public:
 			SyscallProcessor(LinuxVM* lvm) : _lvm(lvm) {}
-			bool callback(const Event* ev, void* data);
+			bool callback(Event* ev, void* data);
 		private:
 			LinuxVM* _lvm;
 	};
@@ -80,7 +84,7 @@ namespace libvmtrace
 	{
 		public:
 			CodeInjectionProcessorCr3(LinuxVM* lvm) : _lvm(lvm) {}
-			bool callback(const Event* ev, void* data);
+			bool callback(Event* ev, void* data);
 		private:
 			LinuxVM* _lvm;
 	};
@@ -89,7 +93,7 @@ namespace libvmtrace
 	{
 		public:
 			CodeInjectionProcessorInt3(LinuxVM* lvm) : _lvm(lvm) {}
-			bool callback(const Event* ev, void* data);
+			bool callback(Event* ev, void* data);
 		private:
 			LinuxVM* _lvm;
 	};
@@ -108,7 +112,7 @@ namespace libvmtrace
 
 		status_t RegisterSyscall(SyscallEvent& ev);
 		status_t DeRegisterSyscall(SyscallEvent& ev);
-		bool ProcessSyscall(const SyscallBreakpoint* ev, void* data, vmi_instance_t);
+		bool ProcessSyscall(SyscallBreakpoint* ev, void* data, vmi_instance_t);
 
 		status_t PauseSyscall(SyscallEvent& ev);
 		status_t ResumeSyscall(SyscallEvent& ev);
@@ -133,7 +137,7 @@ namespace libvmtrace
 		std::vector<uint8_t> ExtractFile(const Process& p, const std::string file);
 
 		bool ProcessCR3CodeInjection(vmi_instance_t vmi, vmi_event_t *event);
-		bool ProcessInt3CodeInjection(const ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi);
+		bool ProcessInt3CodeInjection(ProcessBreakpointEvent* ev, void* data, vmi_instance_t vmi);
 
 		std::pair<addr_t, addr_t> GetCodeArea(vmi_pid_t pid);
 	private:
@@ -157,10 +161,10 @@ namespace libvmtrace
 
 		status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, std::string command, EventListener* evl);
 
-		std::unordered_map<int, const SyscallEvent*> _SyscallEvents64;
-		std::unordered_map<int, const SyscallEvent*> _SyscallEvents32;
-		std::map<int, const SyscallBreakpoint> _Syscallbps64;
-		std::map<int, const SyscallBreakpoint> _Syscallbps32;
+		std::unordered_map<int, SyscallEvent*> _SyscallEvents64;
+		std::unordered_map<int, SyscallEvent*> _SyscallEvents32;
+		std::map<int, SyscallBreakpoint> _Syscallbps64;
+		std::map<int, SyscallBreakpoint> _Syscallbps32;
 		SyscallProcessor _syscallProc;
 
 		uint64_t _total_address_per_inst;
@@ -171,7 +175,6 @@ namespace libvmtrace
 
 		ProcessChangeEvent* _process_change;
 		std::vector<CodeInjection> _code_injections;
-		CodeInjection* _last_code_injection = nullptr;
 		CodeInjectionProcessorCr3 _code_injection_proc_cr3;
 		CodeInjectionProcessorInt3 _code_injection_proc_int3;
 	};

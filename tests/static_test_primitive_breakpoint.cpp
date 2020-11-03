@@ -19,9 +19,9 @@ std::shared_ptr<LinuxVM> vm;
 class TestListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const auto bp_event = reinterpret_cast<const BPEventData* const>(data);
+			const auto bp_event = reinterpret_cast<BPEventData* const>(data);
 			LockGuard guard(sm);
 			vmi_set_vcpureg(guard.get(), 1, RAX, bp_event->vcpu);
 			return false;

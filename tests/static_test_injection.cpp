@@ -32,7 +32,7 @@ static void close_handler(int sig)
 class TestListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
 			CodeInjection* s = (CodeInjection*)data;
 
@@ -51,7 +51,7 @@ class TestListener : public EventListener
 class TestListener1 : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
 			// cout << "called" << endl;
 			return false;

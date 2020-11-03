@@ -41,9 +41,9 @@ class TestListener : public EventListener
 	public:
 		TestListener(Log& log):_log(log){}
 		
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				//cout << sev->GetName() << endl;

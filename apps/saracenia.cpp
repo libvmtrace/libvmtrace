@@ -80,7 +80,7 @@ class ProcessChangeListener : public EventListener
 {
 	public:
 		ProcessChangeListener(){}
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
 			vmi_event_t* a = (vmi_event_t*) data;
 
@@ -152,9 +152,9 @@ ProcessChangeListener* processChangeListener;
 class CloneListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				vmi_instance_t vmi = _sm->Lock();
@@ -197,9 +197,9 @@ CloneListener* cloneListener;
 class ExecListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				SyscallJson* s = (SyscallJson*)data;
@@ -242,9 +242,9 @@ ExecListener* execListener;
 class KillListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				vmi_instance_t vmi = _sm->Lock();
@@ -271,9 +271,9 @@ KillListener* killListener;
 class SendToListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				vmi_instance_t vmi = _sm->Lock();
@@ -320,9 +320,9 @@ SendToListener* sendToListener;
 class WriteListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				vmi_instance_t vmi = _sm->Lock();
@@ -428,9 +428,9 @@ WriteListener* writeListener;
 class CloseListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				SyscallBasic* s = (SyscallBasic*)data;
@@ -462,9 +462,9 @@ CloseListener* closeListener;
 class LSeekListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			SyscallEvent* sev = dynamic_cast<SyscallEvent*>(ev);
 			if(sev)
 			{
 				vmi_instance_t vmi = _sm->Lock();
@@ -521,9 +521,9 @@ LSeekListener* lseekListener;
 class BuffGetU8Listener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;
@@ -595,9 +595,9 @@ BuffGetU8Listener* buffGetU8Listener;
 class PacketSend2WrappedListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;
@@ -743,9 +743,9 @@ PacketSend2WrappedListener* packetSend2WrappedListener;
 class AuthPasswordPostListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;
@@ -781,9 +781,9 @@ ProcessBreakpointEvent* _authPasswordPostEvent;
 class AuthPasswordListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;
@@ -889,9 +889,9 @@ AuthPasswordListener* authPasswordListener;
 class ChannelConnectToPortListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;
@@ -934,9 +934,9 @@ ChannelConnectToPortListener* channelConnectToPortListener;
 class KexDerivedBeginListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data)
 		{
-			const ProcessBreakpointEvent* sev = dynamic_cast<const ProcessBreakpointEvent*>(ev);
+			ProcessBreakpointEvent* sev = dynamic_cast<ProcessBreakpointEvent*>(ev);
 			if(sev)
 			{
 				BPEventData* a = (BPEventData*) data;

@@ -33,7 +33,7 @@ static void close_handler(int sig)
 class TestListener : public EventListener
 {
 	public:
-		bool callback(const Event* ev, void* data)
+		bool callback(Event* ev, void* data) final
 		{
 			vmi_instance_t vmi = _sm->Lock();
 			process_hash(vmi, *_linux);
