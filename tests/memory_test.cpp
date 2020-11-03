@@ -28,6 +28,8 @@ static void close_handler(int sig)
 	interrupted = true;
 }
 
+std::shared_ptr<SystemMonitor> sm;
+
 class TestListener : public EventListener 
 {
 	public:
@@ -37,7 +39,7 @@ class TestListener : public EventListener
 		bool callback(const Event* ev, void* data)
 		{
 			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
-			if(sev)
+			if (sev)
 			{
 				time_t currentTime = chrono::system_clock::now().time_since_epoch() / chrono::milliseconds(1);
 				// _log.log("test", "test", currentTime+"");
@@ -46,6 +48,14 @@ class TestListener : public EventListener
 				SyscallJson* s = (SyscallJson*)data;
 				_log.log("test", "test", s->ToJson());
 			}
+
+			/*const auto sys = reinterpret_cast<SyscallBasic*>(data);
+			if (sys)
+			{
+				const auto vmi = sm->Lock();
+				std::cout << "Got syscall from " << std::dec << sys->GetPid(vmi) << std::endl;
+				sm->Unlock();
+			}*/
 			return false;
 		}
 	private:
@@ -73,7 +83,7 @@ int main(int argc, char* argv[])
 	//sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 
-	auto sm = std::make_shared<SystemMonitor>(argv[1], true);
+	sm = std::make_shared<SystemMonitor>(argv[1], true);
 
 	// Altp2m altp2m(sm);
 	// sm.SetProfile("/root/profiles/ubuntu/ubuntu1604-4.4.0-124-generic.json");
@@ -123,6 +133,9 @@ int main(int argc, char* argv[])
 
 	while(!interrupted) 
 		sleep(1);
+
+	delete testListener;
+	delete log;
 
 	return 0;
 }

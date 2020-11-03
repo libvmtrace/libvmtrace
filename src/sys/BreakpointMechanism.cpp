@@ -72,7 +72,7 @@ namespace libvmtrace
 		auto addr = ev->GetAddr();
 		const auto kernel_space = !!dynamic_cast<const SyscallBreakpoint*>(ev);
 		const auto pbp = dynamic_cast<const ProcessBreakpointEvent*>(ev);
-		const auto patch = std::make_shared<Patch>(addr, pbp ? pbp->GetPid() : 0, ALL_VCPU, std::vector<uint8_t>{ TRAP }, kernel_space);
+		auto patch_bytes = std::vector<uint8_t> { TRAP };
 
 		// if the breakpoint is inside a process, translate it here,
 		// so that we only use physical addresses for lookup.
@@ -80,10 +80,89 @@ namespace libvmtrace
 				vmi_translate_uv2p(guard.get(), addr, pbp->GetPid(), &addr) != VMI_SUCCESS)
 			throw std::runtime_error("Could not translate breakpoint location.");
 
+		// check if we can short-circuit nops.
+		auto is_nop = false;
+		if (extended)
+		{
+			uint8_t instr[3];
+			if (vmi_read_pa(guard.get(), addr, 3, instr, nullptr) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to retrieve instructions.");
+
+			// helper to length-disassemble nops.
+			auto length_disasm = [](const uint8_t op) -> uint8_t
+			{
+				// no idea if this decoding is correct,
+				// as it is not documented anywhere in the intel manual.
+				const auto rm32 = !!(op & 0b10000000);
+				const auto rm16 = !!(op & 0b01000000);
+				const auto indx = !!(op & 0b100);
+
+				auto size = 0u;
+				if (rm16 && !rm32)
+					size++;
+				if (indx)
+					size++;
+				if (rm32)
+					size += 4;
+
+				return size;
+			};
+
+			// start of the 0F 1F (non-prefixed multi-byte nop).
+			uint8_t* base = instr[0] == 0x66 ? &instr[1] : &instr[0];
+			const auto mbn = base[0] == 0x0F && base[1] == 0x1F;
+
+			// regular single-byte nop or escape-prefixed nop.
+			if (instr[0] == 0x90 || (instr != base && mbn))
+				is_nop = true;
+			// hinted, multi-byte nops without escape prefix.
+			else if (mbn)
+			{
+				// note: this downgrades the hint information to eax,
+				// maybe copy over the encoded operands in the future?
+				switch (length_disasm(base[2]))
+				{
+				case 0:
+					// nop dword ptr [eax] -> 66 nop
+					patch_bytes.insert(patch_bytes.end(), { 0x66, 0x90 });
+					break;
+				case 1:
+					// nop dword ptr [eax + 00h] -> nop dword ptr [eax]
+					patch_bytes.insert(patch_bytes.end(), { 0x0F, 0x1F, 0x00 });
+					break;
+				case 2:
+					// nop dword ptr [eax + eax * 1 + 00h] -> nop dword ptr [eax + 00h]
+					patch_bytes.insert(patch_bytes.end(), { 0x0F, 0x1F, 0x40, 0x00 });
+					break;
+				case 4:
+					// nop dword ptr [eax + 00000000h] -> 66 nop word ptr [eax + eax * 1 + 00000000h]
+					patch_bytes.insert(patch_bytes.end(), { 0x66, 0x0F, 0x1F, 0x44, 0x00, 0x00 });
+					break;
+				case 5:
+					// nop dword ptr [eax + eax * 1 + 00000000h] -> nop dword ptr [eax + 00000000h]
+					patch_bytes.insert(patch_bytes.end(), { 0x0F, 0x1F, 0x80, 0x00, 0x00, 0x00, 0x00 });
+					break;
+				default:
+					// these are unhandled and even wrongfully disassembled by our logic above,
+					// but it does not matter, as they start with the escape prefix,
+					// which is handled in the other branch. if we ever encounter these offsets,
+					// something went *terribly* wrong:
+					// -1 : 66 nop
+					// 3  : 66 nop word ptr [eax + eax*1 + 00h]
+					// 6  : 66 nop word ptr [eax + eax*1 + 00000000h]
+					throw std::runtime_error("Catastrophic length disassembler failure!");
+				}
+
+				// if we reach this far, it is a nop aswell.
+				is_nop = true;
+			}
+		}
+
+		const auto patch = std::make_shared<Patch>(addr, pbp ? pbp->GetPid() : 0, ALL_VCPU, patch_bytes, kernel_space);
 		if (patch && !sm->GetInjectionStrategy()->Apply(patch))
 			throw std::runtime_error("Failed to apply patch!");
 
-		bp.insert_or_assign(addr, breakpoint { patch, ev });
+		bp.insert_or_assign(addr, breakpoint { patch, ev, is_nop });
 		return VMI_SUCCESS;
 	}
 
@@ -134,7 +213,7 @@ namespace libvmtrace
 	{
 		const auto instance = reinterpret_cast<BreakpointMechanism*>(event->data);
 
-		const auto bpd = new BPEventData();
+		auto bpd = new BPEventData();
 		bpd->bpm = instance;
 		bpd->vcpu = event->vcpu_id;
 		memcpy(&bpd->regs, event->x86_regs, sizeof(x86_registers_t));
@@ -164,6 +243,13 @@ namespace libvmtrace
 			
 				bpd->beforeSingleStep = false;
 				instance->step_events[event->vcpu_id].data = reinterpret_cast<void*>(bpd);
+
+				// short-circuit if the INT3 replaced a NOP.
+				if (bpd->bp->nop)
+				{
+					event->x86_regs->rip++;
+					return VMI_EVENT_RESPONSE_SET_REGISTERS;
+				}
 
 				if (instance->extended)
 				{

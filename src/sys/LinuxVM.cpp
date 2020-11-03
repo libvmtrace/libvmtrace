@@ -720,17 +720,16 @@ namespace libvmtrace
 		cout << "Process syscall : " << ev->GetName() << " before single step ? " << bpd->beforeSingleStep << endl;
 #endif
 
-		if(bpd->beforeSingleStep)
-			return false;
-		else
+		// unsure if we still need this with the instruction rewriting.
+		//if (bpd->beforeSingleStep && !bpd->bp->nop)
+		//	return false;
+
+		if (ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
 		{
-			if(ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
-			{
-				addr_t rip_pa = 0;
-				vmi_translate_kv2p(vmi,regs->rip, &rip_pa);
-				if(_sm->IsExcludeAddress(rip_pa))
-					return false;
-			}
+			addr_t rip_pa = 0;
+			vmi_translate_kv2p(vmi,regs->rip, &rip_pa);
+			if(_sm->IsExcludeAddress(rip_pa))
+				return false;
 		}
 
 		if (ev->GetType() == BEFORE_CALL)

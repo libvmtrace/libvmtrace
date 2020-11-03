@@ -11,6 +11,7 @@ namespace libvmtrace
 	{
 		std::shared_ptr<Patch> patch;
 		const BreakpointEvent* event;
+		bool nop{};
 	};
 
 	class BreakpointMechanism

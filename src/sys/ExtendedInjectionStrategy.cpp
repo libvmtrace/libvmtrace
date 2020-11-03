@@ -228,7 +228,7 @@ namespace libvmtrace
 			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
 		{
 			auto patch = std::find_if(instance->patches.begin(), instance->patches.end(),
-				[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid; });
+				[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid || p->pid == 0; });
 
 			if (patch != instance->patches.end())
 				event->slat_id = instance->view_x[event->vcpu_id];
@@ -287,8 +287,8 @@ namespace libvmtrace
 			shadow_page->vcpu = vcpu;
 
 			// lookup dtb for the process that we are currently modifying.
-			addr_t dtb;
-			if (vmi_pid_to_dtb(guard.get(), pid, &dtb) != VMI_SUCCESS)
+			addr_t dtb{};
+			if (pid > 0 && vmi_pid_to_dtb(guard.get(), pid, &dtb) != VMI_SUCCESS)
 				throw std::runtime_error("Failed to retrieve DTB for modified process.");
 
 			// copy over page contents to shadow page.
@@ -347,8 +347,8 @@ namespace libvmtrace
 			LockGuard guard(sm);
 			
 			// lookup dtb for the process that we are currently modifying.
-			addr_t dtb;
-			if (vmi_pid_to_dtb(guard.get(), pid, &dtb) != VMI_SUCCESS)
+			addr_t dtb{};
+			if (pid > 0 && vmi_pid_to_dtb(guard.get(), pid, &dtb) != VMI_SUCCESS)
 				throw std::runtime_error("Failed to retrieve DTB for modified process.");
 
 			// unmap the pages from their respective views.

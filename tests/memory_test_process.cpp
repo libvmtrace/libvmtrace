@@ -36,7 +36,7 @@ class TestListener : public EventListener
 		bool callback(const Event* ev, void* data)
 		{
 			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
-			if(sev)
+			if (sev)
 			{
 				time_t currentTime = chrono::system_clock::now().time_since_epoch() / chrono::milliseconds(1);
 				// _log.log("test", "test", currentTime+"");
@@ -46,13 +46,13 @@ class TestListener : public EventListener
 				_log.log("test", "test", s->ToJson());
 			}
 
-			/*const auto sys = reinterpret_cast<SyscallBasic*>(data);
+			const auto sys = reinterpret_cast<SyscallBasic*>(data);
 			if (sys)
 			{
 				const auto vmi = sm->Lock();
 				std::cout << "Got syscall from " << std::dec << sys->GetPid(vmi) << std::endl;
 				sm->Unlock();
-			}*/
+			}
 			return false;
 		}
 	private:
@@ -128,6 +128,7 @@ int main(int argc, char* argv[])
 
 	cout << "ready" << endl;
 	for (;;) { /* nothing */ }
+	delete testListener;
 
 	return 0;
 }
