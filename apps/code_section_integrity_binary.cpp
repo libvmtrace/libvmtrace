@@ -9,8 +9,8 @@ using namespace libvmtrace;
 
 static bool interrupted = false;
 
-LinuxVM* _linux;
-SystemMonitor* _sm;
+std::shared_ptr<SystemMonitor> _sm;
+std::shared_ptr<LinuxVM> _linux;
 
 char* binary;
 vmi_pid_t pid;
@@ -22,7 +22,8 @@ static void close_handler(int sig)
 {
 	if (sig == SIGSEGV) 
 	{
-		_linux->Stop();
+		_linux = nullptr;
+		_sm = nullptr;
 	}
 
 	interrupted = true;
@@ -150,24 +151,10 @@ int main(int argc, char* argv[])
 	sigaction(SIGALRM, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 
-	SystemMonitor sm(argv[1], true);
-	_sm = &sm;
+	_sm = std::make_shared<SystemMonitor>(argv[1], true);
+	_linux = std::make_shared<LinuxVM>(_sm);
 
-	Int3 int3(sm);
-	sm.SetBPM(&int3, int3.GetType());
-	sm.Init();
-	int3.Init();
-
-	RegisterMechanism rm(sm);
-	sm.SetRM(&rm);
-	rm.Init();
-
-	sm.Loop();
-
-	LinuxVM linux(&sm);
-	_linux = &linux;
-
-	vmi_instance_t vmi = sm.Lock();
+	vmi_instance_t vmi = _sm->Lock();
 	UNUSED(vmi);
 
 	ElfHelper eh;
@@ -178,15 +165,10 @@ int main(int argc, char* argv[])
 	text_offset = eh.get_section_offset(binaryMap, ".text");
 
 	pid = atoi(argv[2]);
-	process_hash(vmi, linux);
+	process_hash(vmi, *_linux);
 
-	sm.Unlock();
+	_sm->Unlock();
 
 	while(!interrupted) 
-	{
 		sleep(1);
-	}
-
-	linux.Stop();
-	sm.Stop();
 }

@@ -10,11 +10,6 @@ namespace libvmtrace
 {
 	class LinuxVM;
 
-	enum SyscallType 
-	{ 
-		ALL_SYSCALLS, BEFORE_CALL, AFTER_CALL 
-	};
-
 	enum CodeInjectionType
 	{
 		PAGE_FAULT, FORK_EXEC, NOPE
@@ -63,40 +58,6 @@ namespace libvmtrace
 		std::chrono::time_point<std::chrono::high_resolution_clock> start;
 		std::chrono::time_point<std::chrono::high_resolution_clock> start1;
 	};
-	
-	class SyscallBreakpoint: public BreakpointEvent 
-	{
-		public:
-			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson):
-								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
-								_nr(nr),
-								_type(type),
-								_is32bit(is32bit),
-								_processJson(processJson),
-								_syscall(nullptr) {}
-
-			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, SyscallBasic* s):
-								BreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), addr, el),
-								_nr(nr),
-								_type(type),
-								_is32bit(is32bit),
-								_processJson(processJson),
-								_syscall(s) {}
-
-			~SyscallBreakpoint() {}
-			inline int GetNr() const { return _nr; }
-			inline SyscallType GetType() const { return _type; }
-			inline SyscallBasic* GetSyscall() const { return _syscall; }
-			inline bool Is32bit() const { return _is32bit; }
-			inline bool ProcessJson() const { return _processJson; }
-
-		private:
-			int _nr;
-			SyscallType _type;
-			bool _is32bit;
-			bool _processJson;
-			SyscallBasic* _syscall;
-	};
 
 	struct OpenFile
 	{
@@ -133,10 +94,11 @@ namespace libvmtrace
 			LinuxVM* _lvm;
 	};
 
-	class LinuxVM : public OperatingSystem 
+	class LinuxVM : public OperatingSystem, public std::enable_shared_from_this<LinuxVM>
 	{
 	public:
-		LinuxVM(SystemMonitor* sm);
+		LinuxVM(std::shared_ptr<SystemMonitor> sm);
+		~LinuxVM();
 
         	Process GetCurrentProcess(addr_t current_process) const;
 		std::vector<Process> GetProcessList();
@@ -154,9 +116,7 @@ namespace libvmtrace
 		status_t RegisterProcessChange(ProcessChangeEvent& ev);
 		status_t DeRegisterProcessChange(ProcessChangeEvent& ev);
 
-		SystemMonitor* GetSystemMonitor() const { return _sm; }
-
-		void Stop();
+		inline std::shared_ptr<SystemMonitor> GetSystemMonitor() const { return _sm; }
 
 		addr_t GetSymbolAddrVa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
 		addr_t GetSymbolAddrPa(const std::string binaryPath, const Process& p, const std::string symbolName, const bool onlyFunctions = true);
@@ -197,8 +157,8 @@ namespace libvmtrace
 
 		status_t InvokeCodeInjection(CodeInjectionType type, const vmi_pid_t pid, const addr_t target, std::string command, EventListener* evl);
 
-		EventManager<int, const SyscallEvent*> _SyscallEvents64;
-		EventManager<int, const SyscallEvent*> _SyscallEvents32;
+		std::unordered_map<int, const SyscallEvent*> _SyscallEvents64;
+		std::unordered_map<int, const SyscallEvent*> _SyscallEvents32;
 		std::map<int, const SyscallBreakpoint> _Syscallbps64;
 		std::map<int, const SyscallBreakpoint> _Syscallbps32;
 		SyscallProcessor _syscallProc;

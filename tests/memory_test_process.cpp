@@ -16,19 +16,16 @@ using namespace libvmtrace;
 using namespace libvmtrace::util;
 namespace spd = spdlog;
 
-static bool interrupted = false;
+std::shared_ptr<SystemMonitor> sm;
+std::shared_ptr<LinuxVM> vm;
+
 static void close_handler(int sig)
 {
-	if (sig == SIGSEGV) 
-	{
-
-	}
-
 	cerr << "Sending kill signal, please wait a few seconds" << endl;
-	interrupted = true;
+	vm = nullptr;
+	sm = nullptr;
+	exit(sig);
 }
-
-std::shared_ptr<SystemMonitor> sm;
 
 class TestListener : public EventListener 
 {
@@ -49,13 +46,13 @@ class TestListener : public EventListener
 				_log.log("test", "test", s->ToJson());
 			}
 
-			/*const auto sys = reinterpret_cast<SyscallBasic*>(data);
+			const auto sys = reinterpret_cast<SyscallBasic*>(data);
 			if (sys)
 			{
 				const auto vmi = sm->Lock();
 				std::cout << "Got syscall from " << std::dec << sys->GetPid(vmi) << std::endl;
 				sm->Unlock();
-			}*/
+			}
 			return false;
 		}
 	private:
@@ -64,9 +61,9 @@ class TestListener : public EventListener
 
 int main(int argc, char* argv[]) 
 {
-	if (argc != 2)
+	if (argc != 3)
 	{
-		std::cout << argv[0] << " <vmname>  " << endl;
+		std::cout << argv[0] << " <vmname> <pid>" << endl;
 		return -1;
 	}
 
@@ -80,10 +77,10 @@ int main(int argc, char* argv[])
 	sigaction(SIGTERM, &act, NULL);
 	sigaction(SIGINT,  &act, NULL);
 	sigaction(SIGALRM, &act, NULL);
-	//sigaction(SIGSEGV, &act, NULL);
+	sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 
-	sm = std::make_shared<SystemMonitor>(argv[1], true);
+	sm = std::make_shared<SystemMonitor>(argv[1], true, true);
 
 	// Altp2m altp2m(sm);
 	// sm.SetProfile("/root/profiles/ubuntu/ubuntu1604-4.4.0-124-generic.json");
@@ -98,7 +95,7 @@ int main(int argc, char* argv[])
 	// altp2mbasic.Init();
 	// sm.Loop();
 
-	LinuxVM linux(sm);
+	vm = std::make_shared<LinuxVM>(sm);
 
 	Log* log = new Log();
 	log->RegisterLogger(new StdoutLogger(true));
@@ -111,8 +108,8 @@ int main(int argc, char* argv[])
 
 	for(int i = 1 ; i <= 300 ; i++)
 	{
-		SyscallEvent s(i, *testListener, false, false, true);
-		linux.RegisterSyscall(s);
+		SyscallEvent s(i, *testListener, false, false, true, static_cast<vmi_pid_t>(std::stoi(argv[2])));
+		vm->RegisterSyscall(s);
 		events.push_back(s);
 	}
 
@@ -130,12 +127,8 @@ int main(int argc, char* argv[])
 	// UNUSED(close);
 
 	cout << "ready" << endl;
-
-	while(!interrupted) 
-		sleep(1);
-
+	for (;;) { /* nothing */ }
 	delete testListener;
-	delete log;
 
 	return 0;
 }

@@ -8,11 +8,15 @@ set (test_files
 	static_test_injection.cpp
 	static_test_elf_injection.cpp
 	static_test_kafka_commander.cpp
-	static_test_altp2m.cpp
-	static_elasticsearch_test.cpp
+	static_test_elasticsearch.cpp
 	static_test_agent_presence.cpp
 	static_test_file_extraction.cpp
-	memory_test.cpp)
+	static_test_primitive_injection.cpp
+	static_test_extended_injection.cpp
+	static_test_primitive_breakpoint.cpp
+	static_test_extended_breakpoint.cpp
+	memory_test.cpp
+	memory_test_process.cpp)
 
 foreach (test_file ${test_files})
 	string (REPLACE ".cpp" "" final_name ${test_file})

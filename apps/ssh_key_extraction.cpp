@@ -22,10 +22,10 @@ using namespace libvmtrace;
 using namespace libvmtrace::util;
 using namespace helpers;
 
-LinuxVM* _linux;
-SystemMonitor* _sm;
-SSHHelper* _sshhelper;
-ProcessCache* _pc;
+std::shared_ptr<SystemMonitor> _sm;
+std::shared_ptr<LinuxVM> _linux;
+std::unique_ptr<ProcessCache> _pc;
+std::unique_ptr<SSHHelper> _sshhelper;
 
 string _sshd_bin_path = "";
 string _sshd_path = "";
@@ -49,8 +49,8 @@ static void close_handler(int sig)
 
 	if (sig == SIGSEGV) 
 	{
-		_sm->GetBPM()->DeInit();
-		_sm->Stop();
+		_linux = nullptr;
+		_sm = nullptr;
 	}
 
 	interrupted = true;
@@ -159,78 +159,36 @@ int main(int argc, char* argv[])
 
 	get("console")->info("Setting up system monitor");
 
-	SystemMonitor sm(argv[1], true);
-	_sm = &sm;
+	_sm = std::make_shared<SystemMonitor>(argv[1], true, _bp_type > 1);
+	_linux = std::make_shared<LinuxVM>(_sm);
 
-	get("console")->info("Setting up breakpoint mechanism");
-
-	if(_bp_type == 1)
-	{
-		Int3* int3 = new Int3(sm);
-		sm.SetBPM(int3, int3->GetType());
-		sm.Init();
-		int3->Init();
-
-		get("console")->info("Int3 is used");
-	}
-	else if(_bp_type == 2 || _bp_type == 3)
-	{
-		Altp2mBasic* altp2mbasic = new Altp2mBasic(sm);
-		sm.SetBPM(altp2mbasic, altp2mbasic->GetType());
-		sm.Init();
-		altp2mbasic->Init();
-
-		get("console")->info("Basic Altp2m is used");
-	}
-	else
-	{
-		throw runtime_error("Wrong BP type");
-	}
-
-	get("console")->info("Setting up register mechanism");
-
-	RegisterMechanism rm(sm);
-	sm.SetRM(&rm);
-	// rm.Init();
-
-	sm.Loop();
-
-	LinuxVM linux(&sm);
-	_linux = &linux;
-
-	ProcessCache pc(linux);
-	_pc = &pc;
+	_pc = std::make_unique<ProcessCache>(*_linux);
 
 	get("console")->info("Reading the debug symbol");
 
-	SSHHelper sshhelper(_sshd_bin_path, _ip);
-	sshhelper.GetOffsets();
+	_sshhelper = std::make_unique<SSHHelper>(_sshd_bin_path, _ip);
+	_sshhelper->GetOffsets();
 	//sshhelper.OpenSSHConnection();
-	_sshhelper = &sshhelper;
-
 
 	if(FindSSHDParent())
 	{
 		get("console")->info("Parent PID : {0:d}", _sshd_parent_pid);
-		get("console")->info("[kex_derive_keys] VA : {0:x} PA : {1:x}", sshhelper.kex_derive_keys_va, sshhelper.kex_derive_keys_pa);
-		get("console")->info("[do_authentiation2] VA : {0:x} PA : {1:x}", sshhelper.do_authentiation2_va, sshhelper.do_authentiation2_pa);
+		get("console")->info("[kex_derive_keys] VA : {0:x} PA : {1:x}", _sshhelper->kex_derive_keys_va, _sshhelper->kex_derive_keys_pa);
+		get("console")->info("[do_authentiation2] VA : {0:x} PA : {1:x}", _sshhelper->do_authentiation2_va, _sshhelper->do_authentiation2_pa);
 		
 		kexDerivedStart = new KexDerivedStart();
-		ProcessBreakpointEvent* kexDerivedBeginEvent = new ProcessBreakpointEvent("KexDerivedBeginListener", 0, sshhelper.kex_derive_keys_pa, *kexDerivedStart);
-		sm.GetBPM()->InsertBreakpoint(kexDerivedBeginEvent);
+		ProcessBreakpointEvent* kexDerivedBeginEvent = new ProcessBreakpointEvent("KexDerivedBeginListener", 0, _sshhelper->kex_derive_keys_pa, *kexDerivedStart);
+		_sm->GetBPM()->InsertBreakpoint(kexDerivedBeginEvent);
 
 		sshDoAuthentication = new SSHDoAuthentication();
-		ProcessBreakpointEvent* sshDoAuthentication2Event = new ProcessBreakpointEvent("DoAuth2", 0, sshhelper.do_authentiation2_pa, *sshDoAuthentication);
-		sm.GetBPM()->InsertBreakpoint(sshDoAuthentication2Event);
+		ProcessBreakpointEvent* sshDoAuthentication2Event = new ProcessBreakpointEvent("DoAuth2", 0, _sshhelper->do_authentiation2_pa, *sshDoAuthentication);
+		_sm->GetBPM()->InsertBreakpoint(sshDoAuthentication2Event);
 	}
 
 	while(!interrupted) 
 	{
 		sleep(1);
 	}
-
-	linux.Stop();
-	sm.Stop();
 
 	return 0;
 }
@@ -244,7 +202,7 @@ bool FindSSHDParent()
 		if((*it).GetName() == "sshd" && (*it).GetParentPid() == 1)
 		{
 			_sshd_parent_pid = (*it).GetPid();
-			_sshhelper->GetAddresses(_linux, (*it));
+			_sshhelper->GetAddresses(_linux.get(), (*it));
 
 			return true;
 		}

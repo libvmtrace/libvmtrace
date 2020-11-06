@@ -23,8 +23,6 @@ namespace libvmtrace
 					this, std::placeholders::_1, std::placeholders::_2));
 		mmap_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_mmap_break,
 					this, std::placeholders::_1, std::placeholders::_2));
-		execveat_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_execveat,
-					this, std::placeholders::_1, std::placeholders::_2));
 		last_chance_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_last_chance,
 					this, std::placeholders::_1, std::placeholders::_2));
 
@@ -57,17 +55,8 @@ namespace libvmtrace
 
 	bool LinuxELFInjector::on_injection(const Event* event, void* data)
 	{
-		const auto plist = vm->GetProcessList();
-		const auto result = std::find_if(plist.begin(), plist.end(),
-			[&](const auto& p) -> bool { return p.GetPid() == ((CodeInjection*) data)->child_pid; });
-		if (result == plist.end())
-		{
-			throw std::runtime_error("Failed to find forked process.");
-			return false;
-		}
-
 		// store off child process.
-		child = std::make_unique<Process>(*result);
+		refresh_child(((CodeInjection*) data)->child_pid);
 		forked = true;
 
 		// set a callback for the context switch back to the usermode process.
@@ -76,34 +65,33 @@ namespace libvmtrace
 		return true;
 	}
 
+	static void debug_cpu(vmi_instance_t vmi, vmi_pid_t pid, const BPEventData* data)
+	{
+		char test[200];
+		vmi_read_va(vmi, data->regs.rip, pid, 200, test, nullptr);
+		std::cout << "RIP [0x" << std::hex << data->regs.rip << "] dump: "
+			<< std::endl << hexdumptostring(test, 200) << std::endl;
+
+		uint8_t rsi;
+		vmi_read_va(vmi, data->regs.rsi, pid, 1, &rsi, nullptr);
+
+		std::cout << "Registers: " << std::endl
+			<< "RAX: 0x" << std::hex << data->regs.rax << std::endl
+			<< "RDI: 0x" << std::hex << data->regs.rdi << std::endl
+			<< "RSI: 0x" << std::hex << data->regs.rsi << std::endl
+			<< "RSI->: 0x" << std::hex << (uint64_t) rsi << std::endl
+			<< "RDX: 0x" << std::hex << data->regs.rdx << std::endl
+			<< "R10: 0x" << std::hex << data->regs.r10 << std::endl
+			<< "R8: 0x" << std::hex << data->regs.r8 << std::endl
+			<< "R9: 0x" << std::hex << data->regs.r9 << std::endl
+			<< "R12: 0x" << std::hex << data->regs.r12 << std::endl
+			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
+	}
+
 	bool LinuxELFInjector::on_cr3_change(const Event* event, void* data)
 	{
 		LockGuard guard(sm);
 		assert(forked);
-
-		// time out for the return breakpoint.
-		// TODO: this is just a safe-guard in case our return breakpoint is not hit
-		// (which rarely happens for reasons yet unclear to me).
-		if (mapped && std::chrono::duration_cast<std::chrono::milliseconds>(
-					std::chrono::high_resolution_clock::now()
-					- timer).count() > 700)
-			executed = true;
-
-		// detach ourselves once we have completed the injection.
-		if (executed)
-		{
-			// write back original instructions.
-			// note that we don't have to take the instruction pointer into account,
-			// because the syscall will not return on success.
-			// we need to restore the original instructions because the same physical
-			// memory might be mapped into multiple processes.
-			if (vmi_write_va(guard.get(), start, child->GetPid(), stored_bytes.size(),
-						stored_bytes.data(), nullptr) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to restore original instructions.");
-
-			finished = true;
-			return true;
-		}
 
 		// determine process identifier.
 		// also suppress these warnings, they are not a bug.
@@ -125,18 +113,14 @@ namespace libvmtrace
 		if (pid != child->GetPid())
 		{
 			// restore original page.
-			if (!stored_bytes.empty() && start > 0)
-			{
-				if (vmi_write_va(guard.get(), start, child->GetPid(),
+			if (!stored_bytes.empty() && start > 0 && vmi_write_va(guard.get(), start, child->GetPid(),
 					stored_bytes.size(), stored_bytes.data(), nullptr) != VMI_SUCCESS)
-					throw std::runtime_error("Failed to restore original page!");
-			}
+				throw std::runtime_error("Failed to restore original page!");
 
 			return false;
 		}
 		else if (!stored_bytes.empty())
 		{
-
 			// transfer the shellcode first.
 			if (vmi_write_va(guard.get(), start, child->GetPid(), shellcode.size,
 						const_cast<char*>(shellcode.data), nullptr) != VMI_SUCCESS)
@@ -148,10 +132,29 @@ namespace libvmtrace
 				throw std::runtime_error("Failed to restore executable size.");
 
 			// reinsert breakpoint.
-			const auto last_chance_va = start + 0xE1;
+			const auto last_chance_va = start + 0xD7;
 			uint8_t int3 = 0xCC;
 			if (vmi_write_8_va(guard.get(), last_chance_va, child->GetPid(), &int3) != VMI_SUCCESS)
 				throw std::runtime_error("Failed to restore breakpoint.");
+
+			// detach ourselves once we have completed the injection.
+			if (executed && ++page_loop > 200)
+			{
+				sm->GetBPM()->RemoveBreakpoint(mmap_break.get());
+				sm->GetBPM()->RemoveBreakpoint(last_chance_break.get());
+
+				// write back original instructions.
+				// note that we don't have to take the instruction pointer into account,
+				// because the syscall will not return on success.
+				// we need to restore the original instructions because the same physical
+				// memory might be mapped into multiple processes.
+				if (vmi_write_va(guard.get(), start, child->GetPid(), stored_bytes.size(),
+							stored_bytes.data(), nullptr) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to restore original instructions.");
+
+				finished = true;
+				return true;
+			}
 
 			return false;
 		}
@@ -167,20 +170,7 @@ namespace libvmtrace
 
 		// guest os scheduler just context switched our vcpu, clear out the cache.
 		vmi_v2pcache_flush(guard.get(), ~0ull);
-
-		// store off the 'duplicated' child process now.
-		const auto child_pid = child->GetPid();
-		const auto plist = vm->GetProcessList();
-		const auto result = std::find_if(plist.begin(), plist.end(),
-			[&](const auto& p) -> bool { return p.GetPid() == child_pid; });
-
-		if (result == plist.end())
-		{
-			throw std::runtime_error("Failed to find forked process.");
-			return false;
-		}
-
-		child = std::make_unique<Process>(*result);
+		refresh_child(child->GetPid());
 		assert(child->GetDtb() != parent.GetDtb());
 
 		// get user-mode stack pointer.
@@ -207,7 +197,7 @@ namespace libvmtrace
 
 		// determine at which address the interrupt will occur.
 		const auto mmap_va = start + shellcode.interrupt_mmap;
-		const auto last_chance_va = start + 0xE1;
+		const auto last_chance_va = start + 0xD7;
 		if (vmi_translate_uv2p(guard.get(), mmap_va, child->GetPid(), &mmap) != VMI_SUCCESS
 				|| vmi_translate_uv2p(guard.get(), last_chance_va, child->GetPid(), &last_chance) != VMI_SUCCESS)
 			throw std::runtime_error("Could not translate virtual interrupt addresses to physical memory.");
@@ -227,31 +217,7 @@ namespace libvmtrace
 		sm->GetBPM()->InsertBreakpoint(mmap_break.get());
 		last_chance_break = std::make_unique<ProcessBreakpointEvent>("LAST CHANCE BP", 0, last_chance, *last_chance_listener);
 		sm->GetBPM()->InsertBreakpoint(last_chance_break.get());
-		timer = std::chrono::high_resolution_clock::now();
 		return false;
-	}
-
-	static void debug_cpu(vmi_instance_t vmi, vmi_pid_t pid, const BPEventData* data)
-	{
-		char test[200];
-		vmi_read_va(vmi, data->regs.rip, pid, 200, test, nullptr);
-		std::cout << "RIP [0x" << std::hex << data->regs.rip << "] dump: "
-			<< std::endl << hexdumptostring(test, 200) << std::endl;
-
-		uint8_t rsi;
-		vmi_read_va(vmi, data->regs.rsi, pid, 1, &rsi, nullptr);
-
-		std::cout << "Registers: " << std::endl
-			<< "RAX: 0x" << std::hex << data->regs.rax << std::endl
-			<< "RDI: 0x" << std::hex << data->regs.rdi << std::endl
-			<< "RSI: 0x" << std::hex << data->regs.rsi << std::endl
-			<< "RSI->: 0x" << std::hex << (uint64_t) rsi << std::endl
-			<< "RDX: 0x" << std::hex << data->regs.rdx << std::endl
-			<< "R10: 0x" << std::hex << data->regs.r10 << std::endl
-			<< "R8: 0x" << std::hex << data->regs.r8 << std::endl
-			<< "R9: 0x" << std::hex << data->regs.r9 << std::endl
-			<< "R12: 0x" << std::hex << data->regs.r12 << std::endl
-			<< "R13: 0x" << std::hex << data->regs.r13 << std::endl;
 	}
 
 	bool LinuxELFInjector::on_mmap_break(const Event* event, void* data)
@@ -265,7 +231,7 @@ namespace libvmtrace
 		// make sure we are at the break point.
 		if (!bp_event->beforeSingleStep || bp_event->paddr != mmap)
 			return false;
-
+		
 		// write executable to shared memory mapped region.
 		if (vmi_write_va(guard.get(), bp_event->regs.r13, child->GetPid(),
 				executable->size(), executable->data(), nullptr) != VMI_SUCCESS)
@@ -278,11 +244,6 @@ namespace libvmtrace
 
 		// set marker that image was sent to the guest.
 		mapped = true;
-
-		// attach syscall breakpoint.
-		execveat_call = std::make_unique<SyscallEvent>(offsets.execveat_index,
-				*execveat_listener, true, false, false);
-		vm->RegisterSyscall(*execveat_call);
 		return true;
 	}
 	
@@ -291,19 +252,20 @@ namespace libvmtrace
 		LockGuard guard(sm);
 		//const auto bp_event = reinterpret_cast<const BPEventData* const>(data);
 		//debug_cpu(guard.get(), child->GetPid(), bp_event); 
+
+		executed = true;
+		page_loop = 0;
 		return true;
 	}
 
-	bool LinuxELFInjector::on_execveat(const Event* event, void* data)
+	void LinuxELFInjector::refresh_child(const vmi_pid_t pid)
 	{
-		assert(forked);
-		assert(mapped);
-
-		// TODO: make sure this actually our call.
-		
-		// finish mapping process.
-		executed = true;
-		return true;
+		const auto plist = vm->GetProcessList();
+		const auto result = std::find_if(plist.begin(), plist.end(),
+			[&](const auto& p) -> bool { return p.GetPid() == pid; });
+		if (result == plist.end())
+			throw std::runtime_error("Failed to find process.");
+		child = std::make_unique<Process>(*result);
 	}
 
 	bool LinuxELFInjector::injection_listener::callback(const Event* event, void* data)

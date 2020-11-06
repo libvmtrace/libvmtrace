@@ -1,171 +1,92 @@
 
 #include <sys/SystemMonitor.hpp>
-
-using namespace std;
+#include <sys/BreakpointMechanism.hpp>
+#include <sys/RegisterMechanism.hpp>
 
 namespace libvmtrace
 {
-	static int stop_now = 0;
+	using namespace std::chrono_literals;
 
-	SystemMonitor::~SystemMonitor()
+	SystemMonitor::SystemMonitor(const std::string name, const bool event_support, const bool ept_support) noexcept(false) :
+		name(name), event_support(event_support), worker(nullptr), profile(""), ept_support(ept_support)
 	{
+		// dirty trick to prevent shared_from_this from throwing a bad weak ptr.
+		// does this break anything?
+		const auto unused = std::shared_ptr<SystemMonitor>(this, [](SystemMonitor*){});
+		
+		uint64_t init_flags = VMI_INIT_DOMAINNAME;
+
+		if (event_support)
+			init_flags = VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS;
+
+		if (vmi_init_complete(&vmi, (void*) name.c_str(), init_flags, nullptr,
+					VMI_CONFIG_GLOBAL_FILE_ENTRY, nullptr, nullptr) == VMI_FAILURE)
+			throw std::runtime_error("Failed to init VMI.");
+
+		if (vmi_pause_vm(vmi) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to pause VM.");
+
+		rm = std::make_shared<RegisterMechanism>(shared_from_this());
+		
+		if (ept_support)
+			inj = std::make_shared<ExtendedInjectionStrategy>(
+					std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
+		else
+			inj = std::make_shared<PrimitiveInjectionStrategy>(
+					std::shared_ptr<SystemMonitor>(std::shared_ptr<SystemMonitor>{}, this));
+
+		bpm = std::make_shared<BreakpointMechanism>(shared_from_this());
+
+		if (event_support)
+			worker = std::make_shared<std::thread>(&SystemMonitor::ProcessEvents, this); 
+
+		if (vmi_resume_vm(vmi) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to resume VM.");
+	}
+
+	SystemMonitor::~SystemMonitor() noexcept(false)
+	{
+		if (vmi_pause_vm(vmi) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to pause VM.");
+		
+		bpm = nullptr;
+		inj = nullptr;
+		rm = nullptr;
+
 		if (worker)
 		{
+			worker_exit.set_value();
 			worker->join();
-		}
-		
-		stop_now = 1;
-		
-		if(_bpm_type == DRAKVUF)
-		{
-			// drakvuf_close(_drakvuf, false);
-		}
-		else if(_bpm_type == INTTHREE || _bpm_type == ALTP2M)
-		{
-			vmi_destroy(_vmi);
-		}
-	}
-
-	status_t SystemMonitor::Init()
-	{
-		if(_bpm == nullptr)
-		{
-			throw runtime_error("Please attach a breakpoint manager");
+			worker = nullptr;
 		}
 
-		if(_bpm_type == DRAKVUF)
-		{
-			if(!_event_support)
-			{
-				throw runtime_error("Event need to be supported");
-			}
-			else if(_profile == "")
-			{
-				throw runtime_error("Unknown profile");
-			}
-			else
-			{
-				try
-				{
-					// drakvuf_init(&_drakvuf, _name.c_str(), _profile.c_str(), false, false);
-					_initialized = true;
-					return VMI_SUCCESS;
-				}
-				catch(int e)
-				{
-					throw runtime_error("Failed to initialized Drakvuf");
+		if (vmi_resume_vm(vmi) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to resume VM.");
 
-					return VMI_FAILURE;
-				}
-			}
-
-			return VMI_FAILURE;
-		}
-		else if(_bpm_type == INTTHREE || _bpm_type == ALTP2M)
-		{
-			uint64_t init_flags = VMI_INIT_DOMAINNAME;
-		
-			if(_event_support)
-			{
-				init_flags = VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS;
-				_event_support = true;
-			}
-
-			if(!_initialized)
-			{
-				if (vmi_init_complete(&_vmi, (void*)_name.c_str(),init_flags, NULL, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL) == VMI_FAILURE) 
-				{
-					throw runtime_error("Failed to init VMI");
-					return VMI_FAILURE;
-				}
-				else
-				{
-					_initialized = true;
-					return VMI_SUCCESS;
-				}
-			}
-			else
-			{
-				return VMI_FAILURE;
-			}
-		}
-		else
-		{
-			throw runtime_error("Unknown BPM");
-			return VMI_FAILURE;
-		}
-	}
-
-	void SystemMonitor::DeInit()
-	{
-		//vmi_destroy(_vmi);
+		vmi_destroy(vmi);
 	}
 
 	vmi_instance_t SystemMonitor::Lock()
 	{
-		// cout << "LOCK" << endl;
-		_vmi_mtx.lock();
-		
-		// if(_bpm_type == DRAKVUF)
-		// {
-		// 	if (_is_locked == 0)
-		// 	{
-		// 		_vmi = drakvuf_lock_and_get_vmi(_drakvuf);
-		// 	}
-		// 	_is_locked++;
-		// }
-		
-		return _vmi;
+		vmi_mtx.lock();
+		return vmi;
 	}
 
 	void SystemMonitor::Unlock()
 	{
-		// cout << "UNLOCK" << endl;
-		// if(_bpm_type == DRAKVUF)
-		// {
-		// 	_is_locked--;
-		// 	if (_is_locked == 0)
-		// 	{
-		// 		drakvuf_release_vmi(_drakvuf);
-		// 	}
-		// }
-		
-		_vmi_mtx.unlock();	
+		vmi_mtx.unlock();
 	}
 
-	static void process_events(vmi_instance_t vmi) 
+	void SystemMonitor::ProcessEvents()
 	{
-		status_t status;
-		while(stop_now == 0) 
+		const auto future = worker_exit.get_future();
+		while (future.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout)
 		{
-			status = vmi_events_listen(vmi, 500);
-			if (status != VMI_SUCCESS) 
-			{
-				cerr << "Error waiting for events, quitting...\n" << endl;
-			}
+			vmi_mtx.lock();
+			if (vmi_events_listen(vmi, 0) != VMI_SUCCESS)
+				std::cerr << "Error waiting for events, quitting..." << std::endl;
+			vmi_mtx.unlock();
 		}
-	}
-
-	void SystemMonitor::Loop(void)
-	{
-		if(_bpm_type == DRAKVUF)
-		{
-			// worker = new thread(drakvuf_loop, _drakvuf);
-		}
-		else if(_bpm_type == INTTHREE || _bpm_type == ALTP2M)
-		{
-			worker = new thread(process_events, _vmi); 
-		}
-	}
-
-	void SystemMonitor::Stop(void)
-	{
-		stop_now = 1;
-
-		// if(_bpm_type == DRAKVUF)
-		// {
-		// 	drakvuf_interrupt(_drakvuf, 1);
-		// }
 	}
 }
 

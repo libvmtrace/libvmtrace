@@ -1,7 +1,6 @@
 
 #include <libvmtrace.hpp> 
 #include <sys/LinuxVM.hpp>
-#include <sys/LinuxELFInjector.hpp>
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -18,8 +17,8 @@ std::shared_ptr<LinuxVM> vm;
 // shutdown routine.
 void shutdown(int sig)
 {
-	vm = nullptr;
 	sm = nullptr;
+	vm = nullptr;
 
 	exit(sig);
 }
@@ -53,9 +52,9 @@ int main(int argc, char** argv)
 	sigaction(SIGSEGV, &act, nullptr);
 
 	// print usage.
-	if (argc < 4)
+	if (argc < 5)
 	{
-		std::cerr << "USAGE: " << argv[0] << " [VM_NAME] [PID] [EXEC]" << std::endl;
+		std::cerr << "USAGE: " << argv[0] << " [VM_NAME] [PID] [ADDR] [BYTE]" << std::endl;
 		return 1;
 	}
 
@@ -73,14 +72,19 @@ int main(int argc, char** argv)
 			throw std::runtime_error("Failed to retrieve suitable process from VM.");
 
 		std::cout << "Found process: " << process->GetName() << std::endl;
+		
+		const auto addr = static_cast<addr_t>(std::stoi(argv[3]));
+		const auto byte = static_cast<uint8_t>(std::stoi(argv[4]));
+		const auto patch = std::make_shared<Patch>(addr, process->GetPid(), ALL_VCPU, std::vector<uint8_t>{ byte });
+		if (!sm->GetInjectionStrategy()->Apply(patch))
+			throw std::runtime_error("Failed to apply patch!");
 
-		std::ifstream file(std::string("./").append(argv[3]), std::ios::binary);
-		const auto exe = std::make_shared<std::vector<uint8_t>>(
-				std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-
-		LinuxELFInjector inj(sm, vm, *process);
-		const auto child = inj.inject_executable(exe);
-		std::cout << "Forked child: " << std::dec << child.GetPid() << std::endl;
+		std::cout << "Applied patch, press any key to undo it!" << std::endl;
+		std::cin.get();
+		if (!sm->GetInjectionStrategy()->Undo(patch))
+			throw std::runtime_error("Failed to undo patch!");
+		
+		std::cout << "Restored original!" << std::endl;
 	}
 	catch (const std::exception& e)
 	{

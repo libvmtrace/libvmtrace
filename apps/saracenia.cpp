@@ -24,8 +24,8 @@ using namespace libvmtrace::util;
 using namespace libvmtrace::net;
 using namespace helpers;
 
-LinuxVM* _linux;
-SystemMonitor* _sm;
+std::shared_ptr<SystemMonitor> _sm;
+std::shared_ptr<LinuxVM> _linux;
 SSHHelper* _sshhelper;
 ProcessCache* _pc;
 NetMonitor* _nm; // iptables -A FORWARD -i eth0 -p tcp -j NFQUEUE --queue-num 0
@@ -62,8 +62,8 @@ static void close_handler(int sig)
 
 	if (sig == SIGSEGV) 
 	{
-		_sm->GetBPM()->DeInit();
-		_sm->Stop();
+		_linux = nullptr;
+		_sm = nullptr;
 	}
 
 	interrupted = true;
@@ -1094,46 +1094,10 @@ int main(int argc, char* argv[])
 
 	get("console")->info("Setting up system monitor");
 
-	SystemMonitor sm(argv[1], true);
-	_sm = &sm;
+	_sm = std::make_shared<SystemMonitor>(argv[1], true, _bp_type > 1);
+	_linux = std::make_shared<LinuxVM>(_sm);
 
-	get("console")->info("Setting up breakpoint mechanism");
-
-	if(_bp_type == 1)
-	{
-		Int3* int3 = new Int3(sm);
-		sm.SetBPM(int3, int3->GetType());
-		sm.Init();
-		int3->Init();
-
-		get("console")->info("Int3 is used");
-	}
-	else if(_bp_type == 2 || _bp_type == 3)
-	{
-		Altp2mBasic* altp2mbasic = new Altp2mBasic(sm);
-		sm.SetBPM(altp2mbasic, altp2mbasic->GetType());
-		sm.Init();
-		altp2mbasic->Init();
-
-		get("console")->info("Basic Altp2m is used");
-	}
-	else
-	{
-		throw runtime_error("Wrong BP type");
-	}
-
-	get("console")->info("Setting up register mechanism");
-
-	RegisterMechanism rm(sm);
-	sm.SetRM(&rm);
-	// rm.Init();
-
-	sm.Loop();
-
-	LinuxVM linux(&sm);
-	_linux = &linux;
-
-	ProcessCache pc(linux);
+	ProcessCache pc(*_linux);
 	_pc = &pc;
 
 	get("console")->info("Reading the debug symbol");
@@ -1160,24 +1124,24 @@ int main(int argc, char* argv[])
 		get("console")->info("[ssh_packet_send2_wrapped] VA : {0:x} PA : {1:x}", sshhelper.ssh_packet_send2_wrapped_va, sshhelper.ssh_packet_send2_wrapped_pa);
 		get("console")->info("[channel_connect_to_port] VA : {0:x} PA : {1:x}", sshhelper.channel_connect_to_port_va, sshhelper.channel_connect_to_port_pa);
 		
-		vmi_instance_t vmi = sm.Lock();
+		vmi_instance_t vmi = _sm->Lock();
 		addr_t xen_interrupt_va = 0;
 		addr_t xen_interrupt_pa = 0;
 		vmi_translate_ksym2v(vmi, (char*)"xen_hvm_callback_vector", &xen_interrupt_va);
 		vmi_translate_kv2p(vmi, xen_interrupt_va, &xen_interrupt_pa);
-		sm.AddExludeAddress(xen_interrupt_pa);
-		sm.Unlock();
+		_sm->AddExludeAddress(xen_interrupt_pa);
+		_sm->Unlock();
 
 		get("console")->info("[xen_hvm_callback_vector] VA : {0:x} PA : {1:x}", xen_interrupt_va, xen_interrupt_pa);
 	
 		buffGetU8Listener = new BuffGetU8Listener();
 		ProcessBreakpointEvent* buffGetU8Event = new ProcessBreakpointEvent("SSHBuffGetU8Listener", 0, sshhelper.sshbuf_get_u8_pa, *buffGetU8Listener);
-		sm.GetBPM()->InsertBreakpoint(buffGetU8Event);
+		_sm->GetBPM()->InsertBreakpoint(buffGetU8Event);
 		// UNUSED(buffGetU8Event);
 		
 		packetSend2WrappedListener = new PacketSend2WrappedListener();
 		ProcessBreakpointEvent* packetSend2WrappedEvent = new ProcessBreakpointEvent("PacketSend2WrappedListener", 0, sshhelper.ssh_packet_send2_wrapped_pa, *packetSend2WrappedListener);
-		sm.GetBPM()->InsertBreakpoint(packetSend2WrappedEvent);
+		_sm->GetBPM()->InsertBreakpoint(packetSend2WrappedEvent);
 		// UNUSED(packetSend2WrappedEvent);
 
 		// char* testing = new char[8];
@@ -1187,7 +1151,7 @@ int main(int argc, char* argv[])
 		
 		authPasswordListener = new AuthPasswordListener();
 		ProcessBreakpointEvent* authPasswordEvent = new ProcessBreakpointEvent("AuthPasswordListener", 0, sshhelper.auth_password_pa, *authPasswordListener);
-		sm.GetBPM()->InsertBreakpoint(authPasswordEvent);
+		_sm->GetBPM()->InsertBreakpoint(authPasswordEvent);
 
 		// vmi_read_pa(vmi, sshhelper.auth_password_pa, 8, testing, NULL);
 		// cout << hexdumptostring(testing, 8) << endl;
@@ -1197,13 +1161,13 @@ int main(int argc, char* argv[])
 
 		kexDerivedBeginListener = new KexDerivedBeginListener();
 		ProcessBreakpointEvent* kexDerivedBeginEvent = new ProcessBreakpointEvent("KexDerivedBeginListener", 0, sshhelper.kex_derive_keys_pa, *kexDerivedBeginListener);
-		sm.GetBPM()->InsertBreakpoint(kexDerivedBeginEvent);
+		_sm->GetBPM()->InsertBreakpoint(kexDerivedBeginEvent);
 		// UNUSED(kexDerivedBeginEvent);
 		// kexDerivedBeginPostListener = new KexDerivedBeginPostListener();
 
 		channelConnectToPortListener = new ChannelConnectToPortListener();
 		ProcessBreakpointEvent* channelConnectToPortEvent = new ProcessBreakpointEvent("ChannelConnectToPortListener", 0, sshhelper.channel_connect_to_port_pa, *channelConnectToPortListener);
-		sm.GetBPM()->InsertBreakpoint(channelConnectToPortEvent);
+		_sm->GetBPM()->InsertBreakpoint(channelConnectToPortEvent);
 		// UNUSED(channelConnectToPortEvent);
 
 		cloneListener = new CloneListener();
@@ -1221,19 +1185,19 @@ int main(int argc, char* argv[])
 		sendToListener = new SendToListener();
 		sendToS = new SyscallEvent(44, *sendToListener, false, false, false);
 
-		linux.RegisterSyscall(*cloneS);
-		linux.RegisterSyscall(*killS);
-		linux.RegisterSyscall(*writeS);
-		linux.RegisterSyscall(*closeS);
-		linux.RegisterSyscall(*execveS);
-		linux.RegisterSyscall(*sendToS);
+		_linux->RegisterSyscall(*cloneS);
+		_linux->RegisterSyscall(*killS);
+		_linux->RegisterSyscall(*writeS);
+		_linux->RegisterSyscall(*closeS);
+		_linux->RegisterSyscall(*execveS);
+		_linux->RegisterSyscall(*sendToS);
 
 		if(_process_change != 0)
 		{
 			processChangeListener = new ProcessChangeListener();
 			process_change = new ProcessChangeEvent(*processChangeListener);
 
-			linux.RegisterProcessChange(*process_change);
+			_linux->RegisterProcessChange(*process_change);
 		}
 		
 		get("console")->info("Saracenia is ready");
@@ -1252,9 +1216,6 @@ int main(int argc, char* argv[])
 		sleep(1);
 	}
 
-	linux.Stop();
-	sm.Stop();
-
 	return 0;
 }
 
@@ -1266,7 +1227,7 @@ bool FindSSHDParent()
 		if((*it).GetName() == "sshd" && (*it).GetParentPid() == 1)
 		{
 			_sshd_parent_pid = (*it).GetPid();
-			_sshhelper->GetAddresses(_linux, (*it));
+			_sshhelper->GetAddresses(_linux.get(), (*it));
 
 			return true;
 		}

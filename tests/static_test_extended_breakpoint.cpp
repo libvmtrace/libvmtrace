@@ -1,7 +1,7 @@
 
 #include <libvmtrace.hpp> 
 #include <sys/LinuxVM.hpp>
-#include <sys/LinuxELFInjector.hpp>
+#include <util/LockGuard.hpp>
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -10,10 +10,23 @@
 #include <optional>
 
 using namespace libvmtrace;
+using namespace util;
 
 // vmtrace wrapper.
 std::shared_ptr<SystemMonitor> sm;
 std::shared_ptr<LinuxVM> vm;
+
+class TestListener : public EventListener
+{
+	public:
+		bool callback(const Event* ev, void* data)
+		{
+			const auto bp_event = reinterpret_cast<const BPEventData* const>(data);
+			LockGuard guard(sm);
+			vmi_set_vcpureg(guard.get(), 1, RAX, bp_event->vcpu);
+			return false;
+		}
+};
 
 // shutdown routine.
 void shutdown(int sig)
@@ -55,12 +68,12 @@ int main(int argc, char** argv)
 	// print usage.
 	if (argc < 4)
 	{
-		std::cerr << "USAGE: " << argv[0] << " [VM_NAME] [PID] [EXEC]" << std::endl;
+		std::cerr << "USAGE: " << argv[0] << " [VM_NAME] [PID] [ADDR]" << std::endl;
 		return 1;
 	}
 
 	// create vmtrace wrapper objects.
-	sm = std::make_shared<SystemMonitor>(argv[1], true);
+	sm = std::make_shared<SystemMonitor>(argv[1], true, true);
 
 	// initialize vmtrace and delegate.
 	try
@@ -73,14 +86,17 @@ int main(int argc, char** argv)
 			throw std::runtime_error("Failed to retrieve suitable process from VM.");
 
 		std::cout << "Found process: " << process->GetName() << std::endl;
+		
+		const auto addr = static_cast<addr_t>(std::stoi(argv[3]));
+		TestListener test_listener{};
+		const auto bp = std::make_unique<ProcessBreakpointEvent>("Test", process->GetPid(), addr, test_listener, true);
+		sm->GetBPM()->InsertBreakpoint(bp.get());
 
-		std::ifstream file(std::string("./").append(argv[3]), std::ios::binary);
-		const auto exe = std::make_shared<std::vector<uint8_t>>(
-				std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+		std::cout << "Set breakpoint, press any key to undo it!" << std::endl;
+		std::cin.get();
+		sm->GetBPM()->RemoveBreakpoint(bp.get());
 
-		LinuxELFInjector inj(sm, vm, *process);
-		const auto child = inj.inject_executable(exe);
-		std::cout << "Forked child: " << std::dec << child.GetPid() << std::endl;
+		std::cout << "Restored original!" << std::endl;
 	}
 	catch (const std::exception& e)
 	{

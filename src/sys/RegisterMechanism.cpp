@@ -1,94 +1,87 @@
 
 #include <sys/RegisterMechanism.hpp>
+#include <util/LockGuard.hpp>
 
 namespace libvmtrace
 {
-	static event_response_t REG_CB(vmi_instance_t vmi, vmi_event_t *event)
+	using namespace util;
+	using namespace std::chrono_literals;
+
+	RegisterMechanism::RegisterMechanism(std::shared_ptr<SystemMonitor> sm) : sm(sm)
 	{
-		RegisterMechanism* rm = (RegisterMechanism*)event->data; 
+		if (!sm->IsEventSupported())
+			throw std::runtime_error("Event not supported");
 
-		rm->ProcessRegisterEvent(event);
-
-		return 0;
+		SETUP_REG_EVENT(&register_event, CR3, VMI_REGACCESS_W, false, HandleRegisterEvent);
 	}
 
-	void RegisterMechanism::ProcessRegisterEvent(vmi_event_t* ev)
+	RegisterMechanism::~RegisterMechanism()
 	{
-		_sm.Lock();
-
-		_RegEvents.Call(ev->reg_event.reg, ev);
-		
-		_sm.Unlock();
-	}
-
-	status_t RegisterMechanism::Init()
-	{
-		if(GetSystemMonitor().IsInitialized())
+		// make sure all rings have been processed.
+		vmi_instance_t vmi;
+		for (;;)
 		{
-			vmi_instance_t vmi = GetSystemMonitor().Lock();
+			{
+				vmi = sm->Lock();
+				if (!vmi_are_events_pending(vmi))
+					break;
+				sm->Unlock();
+			}
+			std::this_thread::sleep_for(1ms);
+		}
 
-			memset(&_register_event, 0, sizeof(vmi_event_t));
-			_register_event.version = VMI_EVENTS_VERSION;
-			_register_event.type = VMI_EVENT_REGISTER;
-			_register_event.reg_event.reg = CR3;
-			_register_event.reg_event.in_access = VMI_REGACCESS_W;
-			_register_event.data = this;
-			_register_event.callback = REG_CB;
-			vmi_register_event(vmi, &_register_event);
+		vmi_clear_event(vmi, &register_event, nullptr);
+		sm->Unlock();
+	}
 
-			GetSystemMonitor().Unlock();
+	void RegisterMechanism::InsertRegisterEvent(const ProcessChangeEvent* ev)
+	{
+		reg_events.push_back(ev);
+		SetRegisterEvent(true);
+	}
 
-			_initialized = true;
+	void RegisterMechanism::RemoveRegisterEvent(const ProcessChangeEvent* ev)
+	{
+		reg_events.erase(std::remove(reg_events.begin(), reg_events.end(), ev), reg_events.end());
+		if (reg_events.empty()) SetRegisterEvent(false);
+	}
 
-			return VMI_SUCCESS;
+	void RegisterMechanism::SetRegisterEvent(const bool value)
+	{
+		LockGuard guard(sm);
+
+		if (!!register_event.data == value)
+			return;
+
+		if (vmi_pause_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to pause VM.");
+
+		if (value)
+		{
+			register_event.data = this;
+			vmi_register_event(guard.get(), &register_event);
 		}
 		else
 		{
-			throw std::runtime_error("System Monitor is not yet initialized");
-		
-		return VMI_FAILURE;
+			register_event.data = nullptr;
+			vmi_clear_event(guard.get(), &register_event, nullptr);
 		}
-		
 
-		return VMI_FAILURE;
+		if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
+			throw std::runtime_error("Failed to resume VM.");
 	}
 
-	void RegisterMechanism::DeInit()
+	event_response_t RegisterMechanism::HandleRegisterEvent(vmi_instance_t vmi, vmi_event_t* event)
 	{
-		if(_initialized)
-		{
-			vmi_instance_t vmi = GetSystemMonitor().Lock();
-
-			vmi_clear_event(vmi, &_register_event, NULL);
-			_initialized = false;
-
-			GetSystemMonitor().Unlock();
-		}
-	}
-
-	status_t RegisterMechanism::InsertRegisterEvent(const ProcessChangeEvent* ev)
-	{
-		_RegEvents.RegisterEvent(ev->ev.reg_event.reg, ev);
-		if(!_initialized)
-		{
-			Init();
-		}
-
-		return VMI_FAILURE;
-	}
-
-	status_t RegisterMechanism::RemoveRegisterEvent(const ProcessChangeEvent* ev)
-	{
-		_RegEvents.DeRegisterEvent(ev->ev.reg_event.reg, ev);
-		if (_RegEvents.GetCount(ev->ev.reg_event.reg) == 0)
-		{
-			if(_initialized)
-			{
-				DeInit();
-			}
-		}
-
-		return VMI_FAILURE;
+		const auto instance = (RegisterMechanism*) event->data;
+		LockGuard guard(instance->sm);
+		for (auto it = instance->reg_events.begin(); it != instance->reg_events.end();)
+			if (*it && (*it)->callback(event))
+				it = instance->reg_events.erase(it);
+			else
+				it++;
+		std::cout << "reg ev!\n";
+		return 0;
 	}
 }
 

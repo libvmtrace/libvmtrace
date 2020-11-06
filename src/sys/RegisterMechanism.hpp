@@ -10,32 +10,19 @@ namespace libvmtrace
 	class RegisterMechanism
 	{
 		public:
-			RegisterMechanism(SystemMonitor& sm):_sm(sm), _initialized(false)
-			{
-				if(!sm.IsEventSupported())
-				{
-					throw std::runtime_error("Event not supported");
-				}
-			}
-			status_t Init();
-			void DeInit();
-			status_t InsertRegisterEvent(const ProcessChangeEvent* ev);
-			status_t RemoveRegisterEvent(const ProcessChangeEvent* ev);
+			RegisterMechanism(std::shared_ptr<SystemMonitor> sm);
+			~RegisterMechanism();
 
-			void ProcessRegisterEvent(vmi_event_t* ev);
-			
-			SystemMonitor& GetSystemMonitor()
-			{
-				return _sm;
-			}
+			void InsertRegisterEvent(const ProcessChangeEvent* ev);
+			void RemoveRegisterEvent(const ProcessChangeEvent* ev);
+
 		private:
-			SystemMonitor& _sm;
+			void SetRegisterEvent(const bool value);
+			static event_response_t HandleRegisterEvent(vmi_instance_t vmi, vmi_event_t *event);
 
-			vmi_event_t _register_event;
-
-			EventManager<uint64_t, const RegEvent*> _RegEvents;
-
-			bool _initialized;
+			std::shared_ptr<SystemMonitor> sm;
+			vmi_event_t register_event;
+			std::vector<const RegEvent*> reg_events;
 	};
 }
 

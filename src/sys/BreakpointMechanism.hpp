@@ -3,69 +3,52 @@
 
 #include <sys/Event.hpp>
 #include <sys/SystemMonitor.hpp>
+#include <unordered_map>
 
 namespace libvmtrace
 {
-	constexpr auto TRAP = 0xCC;
+	struct breakpoint
+	{
+		std::shared_ptr<Patch> patch;
+		const BreakpointEvent* event;
+		bool nop{};
+	};
 
 	class BreakpointMechanism
 	{
+		inline static constexpr auto TRAP = 0xCC;
+
 		public:
-			BreakpointMechanism(SystemMonitor& sm):_sm(sm)
-			{
-				_counter = 0;
-				if(!sm.IsEventSupported())
-				{
-					throw std::runtime_error("Event not supported");
-				}
-			}
+			BreakpointMechanism(std::shared_ptr<SystemMonitor> sm);
+			~BreakpointMechanism();
+			status_t InsertBreakpoint(const BreakpointEvent* ev);
+			status_t RemoveBreakpoint(const BreakpointEvent* ev);
 
-			virtual status_t Init() = 0;
-			virtual void DeInit() = 0;
-			virtual status_t InsertBreakpoint(const BreakpointEvent* ev) = 0;
-			virtual status_t RemoveBreakpoint(const BreakpointEvent* ev) = 0;
+			void Disable();
+			void Enable();
 
-			//used for procchange
-			virtual status_t TemporaryRemoveBreakpoint(const BreakpointEvent* ev) = 0;
-			virtual status_t ReInsertBreakpoint(const BreakpointEvent* ev) = 0;
-
-			virtual bpm_type_t GetType() = 0;
-
-			void IncreaseCounter()
-			{
-				// cout << "add" << endl;
-				_counter++;
-			}
-
-			void DecreaseCounter()
-			{
-				// cout << "deduct" << endl;
-				_counter--;
-			}
-
-			int GetCounter()
-			{
-				return _counter;
-			}
-
-			SystemMonitor& GetSystemMonitor()
-			{
-				return _sm;
-			}
 		private:
-			SystemMonitor& _sm;
-			int _counter;
+			static event_response_t HandleInterruptEvent(vmi_instance_t vmi, vmi_event_t* event);
+			static event_response_t HandleStepEvent(vmi_instance_t vmi, vmi_event_t* event);
+
+			std::shared_ptr<SystemMonitor> sm;
+			vmi_event_t interrupt_event;
+			std::vector<vmi_event_t> step_events;
+			std::unordered_map<addr_t, breakpoint> bp;
+			bool disabled{}, extended{};
 	};
 
 	struct BPEventData
 	{
 		unsigned int vcpu;
 		x86_registers_t regs;
+		breakpoint* bp;
+		uint16_t slat_id;
 		void* raw_event;
 		addr_t paddr;
 		BreakpointMechanism* bpm;
 
-		bool beforeSingleStep;
+		bool beforeSingleStep = true;
 		addr_t ripAfterSingleStep;
 		std::string proc_name;
 		int pid;

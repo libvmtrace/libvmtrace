@@ -30,8 +30,8 @@ using namespace libvmtrace::util;
 using namespace helpers;
 using namespace spdlog;
 
-LinuxVM* _linux;
-SystemMonitor* _sm;
+std::shared_ptr<SystemMonitor> _sm;
+std::shared_ptr<LinuxVM> _linux;
 SSHHelper* _sshhelper;
 ProcessCache* _pc;
 // elastic* _e;
@@ -67,8 +67,8 @@ static void close_handler(int sig)
 {
 	if (sig == SIGSEGV) 
 	{
-		_sm->GetBPM()->DeInit();
-		_sm->Stop();
+		_linux = nullptr;
+		_sm = nullptr;
 	}
 
 	interrupted = true;
@@ -800,27 +800,10 @@ int main(int argc, char* argv[])
 		_el->CreateIndex("git-monitoring", "\"mappings\":{\"doc\":{\"properties\":{\"TS\":{\"type\":\"date\"},\"ip\":{\"type\":\"ip\"}}}}");
 	}
 
-	SystemMonitor sm(argv[1], true);
-	_sm = &sm;
+	_sm = std::make_shared<SystemMonitor>(argv[1], true, true);
+	_linux = std::make_shared<LinuxVM>(_sm);
 
-	Altp2mBasic* altp2mbasic = new Altp2mBasic(sm);
-	sm.SetBPM(altp2mbasic, altp2mbasic->GetType());
-	sm.Init();
-	altp2mbasic->Init();
-
-	// Int3* int3 = new Int3(sm);
-	// sm.SetBPM(int3, int3->GetType());
-	// sm.Init();
-	// int3->Init();
-
-	// RegisterMechanism rm(sm);
-	// sm.SetRM(&rm);
-	sm.Loop();
-
-	LinuxVM linux(&sm);
-	_linux = &linux;
-
-	ProcessCache pc(linux);
+	ProcessCache pc(*_linux);
 	_pc = &pc;
 
 	SSHHelper sshhelper(_sshd_bin_path, _ip);
@@ -846,21 +829,21 @@ int main(int argc, char* argv[])
 
 	if(FindSSHDParent())
 	{
-		vmi_instance_t vmi = sm.Lock();
+		vmi_instance_t vmi = _sm->Lock();
 		addr_t xen_interrupt_va = 0;
 		addr_t xen_interrupt_pa = 0;
 		vmi_translate_ksym2v(vmi, (char*)"xen_hvm_callback_vector", &xen_interrupt_va);
 		vmi_translate_kv2p(vmi, xen_interrupt_va, &xen_interrupt_pa);
-		sm.AddExludeAddress(xen_interrupt_pa);
-		sm.Unlock();
+		_sm->AddExludeAddress(xen_interrupt_pa);
+		_sm->Unlock();
 
 		buffGetU8Listener = new BuffGetU8Listener();
 		ProcessBreakpointEvent* buffGetU8Event = new ProcessBreakpointEvent("SSHBuffGetU8Listener", 0, sshhelper.sshbuf_get_u8_pa, *buffGetU8Listener);
-		sm.GetBPM()->InsertBreakpoint(buffGetU8Event);
+		_sm->GetBPM()->InsertBreakpoint(buffGetU8Event);
 
 		packetSend2WrappedListener = new PacketSend2WrappedListener();
 		ProcessBreakpointEvent* packetSend2WrappedEvent = new ProcessBreakpointEvent("PacketSend2WrappedListener", 0, sshhelper.ssh_packet_send2_wrapped_pa, *packetSend2WrappedListener);
-		sm.GetBPM()->InsertBreakpoint(packetSend2WrappedEvent);
+		_sm->GetBPM()->InsertBreakpoint(packetSend2WrappedEvent);
 
 		cloneListener = new CloneListener();
 		SyscallEvent* cloneS = new SyscallEvent(56, *cloneListener, true, false, false);
@@ -873,17 +856,7 @@ int main(int argc, char* argv[])
 	}
 
 	while(!interrupted) 
-	{
 		sleep(1);
-	}
-
-	// if(db)
-	// {
-	// 	sqlite3_close(db);
-	// }
-
-	linux.Stop();
-	sm.Stop();
 
 	return 0;
 }
@@ -897,7 +870,7 @@ bool FindSSHDParent()
 		{
 			_sshd_parent_pid = (*it).GetPid();
 			cout << dec << "parent sshd : " << _sshd_parent_pid << endl;
-			_sshhelper->GetAddresses(_linux, (*it));
+			_sshhelper->GetAddresses(_linux.get(), (*it));
 
 			return true;
 		}

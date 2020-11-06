@@ -12,6 +12,8 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
+#include <sys/SyscallBasic.hpp>
+
 namespace libvmtrace
 {
 	class Event;
@@ -72,7 +74,7 @@ namespace libvmtrace
 	class BreakpointEvent : public Event 
 	{
 		public:
-			BreakpointEvent(const std::string name, addr_t addr, EventListener& el): Event(el), _name(name), _addr(addr) {}
+			BreakpointEvent(const std::string name, addr_t addr, EventListener& el, bool fast = false) : Event(el), _name(name), _addr(addr), _fast(fast) {}
 			addr_t  GetAddr () const 
 			{ 
 				return _addr;
@@ -83,64 +85,96 @@ namespace libvmtrace
 				return _name;
 			}
 
+			bool IsFast() const
+			{
+				return _fast;
+			}
+
 		protected:
 			BreakpointEvent();
 			const std::string _name;
 			const addr_t _addr;
+			const bool _fast;
+	};
+
+	enum SyscallType
+	{
+		ALL_SYSCALLS, BEFORE_CALL, AFTER_CALL
 	};
 
 	class SyscallEvent : public Event
 	{
 		public:
-			SyscallEvent(int syscallnumber, EventListener& el, bool with_ret, bool is32bit, bool processJson):  
+			SyscallEvent(int syscallnumber, EventListener& el, bool with_ret, bool is32bit, bool processJson, vmi_pid_t pid = 0):  
 				Event(el), 
 				_nr(syscallnumber), 
 				_with_ret(with_ret),
 				_is32bit(is32bit),
-				_processJson(processJson) {}
+				_processJson(processJson),
+				_pid(pid) { }
 
 			inline int GetNr () const { return _nr;};
 			inline bool WithRet() const { return _with_ret; };
 			inline bool Is32bit() const { return _is32bit; };
 			inline bool ProcessJson() const { return _processJson; };
+			inline vmi_pid_t GetPid() const { return _pid; }
 
 		private:
 			const int _nr;
 			const bool _with_ret;
 			const bool _is32bit;
 			const bool _processJson;
+			const vmi_pid_t _pid;
 	};
 
 	class ProcessBreakpointEvent : public BreakpointEvent 
 	{
 		public:
-			ProcessBreakpointEvent(const std::string name, vmi_pid_t pid,addr_t addr,EventListener& el): 
-				BreakpointEvent(name,addr,el),
-				_pid(pid) {}
+			ProcessBreakpointEvent(const std::string name, vmi_pid_t pid, addr_t addr, EventListener& el, bool fast = false) :
+				BreakpointEvent(name, addr, el, fast),
+				_pid(pid) { }
 
 			vmi_pid_t GetPid() const { return _pid; };
 			
 		private:
 			vmi_pid_t _pid; 
+			bool fast;
 	};
 
-	// The EventManager: It manages Event structures and calls EventListeners
-	template<typename U, typename T> class EventManager 
+	// NOTE: For now we do not support *fast* syscall breakpoints.
+	// Unsure, if there are situations, where this is desirable.
+	class SyscallBreakpoint : public ProcessBreakpointEvent
 	{
 		public:
-			EventManager() {};
-			~EventManager() {};
-			void RegisterEvent(U signal, T e);
-			void DeRegisterEvent(U signal, T e);
-			void Call(U signal, void* data);
-			uint64_t GetCount(U signal);
-			void ForEach(void(*f)(T, void*), void* data);
+			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, vmi_pid_t pid = 0) :
+								ProcessBreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), pid, addr, el),
+								_nr(nr),
+								_type(type),
+								_is32bit(is32bit),
+								_processJson(processJson),
+								_syscall(nullptr) { }
+
+			SyscallBreakpoint(addr_t addr, EventListener& el, int nr, SyscallType type, bool is32bit, bool processJson, SyscallBasic* s, vmi_pid_t pid = 0) :
+								ProcessBreakpointEvent("syscall_" + std::to_string(nr) + (type == AFTER_CALL ? " after call" : ""), pid, addr, el),
+								_nr(nr),
+								_type(type),
+								_is32bit(is32bit),
+								_processJson(processJson),
+								_syscall(s) { }
+
+			~SyscallBreakpoint() {}
+			inline int GetNr() const { return _nr; }
+			inline SyscallType GetType() const { return _type; }
+			inline SyscallBasic* GetSyscall() const { return _syscall; }
+			inline bool Is32bit() const { return _is32bit; }
+			inline bool ProcessJson() const { return _processJson; }
 
 		private:
-			void RemoveEvents();    
-			typedef std::map<U, std::vector<T>> evmap;
-			evmap _Events;
-			std::vector<std::pair<U, T>> _DeleteEvents;
+			int _nr;
+			SyscallType _type;
+			bool _is32bit;
+			bool _processJson;
+			SyscallBasic* _syscall;
 	};
 }
 

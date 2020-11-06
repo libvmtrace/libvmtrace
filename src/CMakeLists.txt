@@ -5,9 +5,7 @@ project (vmtrace)
 
 set (sys_files
 	sys/SystemMonitor.cpp
-	sys/Int3.cpp
-	sys/Altp2mBasic.cpp
-	sys/Event.cpp
+	sys/BreakpointMechanism.cpp
 	sys/Process.cpp
 	sys/ElfHelper.cpp
 	sys/OperatingSystem.cpp
@@ -18,7 +16,9 @@ set (sys_files
 	sys/Xen.cpp
 	sys/LinuxELFInjector.cpp
 	sys/LinuxFileExtractor.cpp
-	sys/DwarfHelper.cpp)
+	sys/DwarfHelper.cpp
+	sys/PrimitiveInjectionStrategy.cpp
+	sys/ExtendedInjectionStrategy.cpp)
 
 set (util_files
 	util/utils.cpp
