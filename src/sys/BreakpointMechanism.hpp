@@ -14,6 +14,24 @@ namespace libvmtrace
 		bool nop{};
 	};
 
+	typedef event_response_t(*unhandled_fn)(vmi_event_t*);
+
+	struct BPEventData
+	{
+		unsigned int vcpu;
+		x86_registers_t regs;
+		breakpoint* bp;
+		uint16_t slat_id;
+		void* raw_event;
+		addr_t paddr;
+		BreakpointMechanism* bpm;
+
+		bool beforeSingleStep = true;
+		addr_t ripAfterSingleStep;
+		std::string proc_name;
+		int pid;
+	};
+
 	class BreakpointMechanism
 	{
 		inline static constexpr auto TRAP = 0xCC;
@@ -34,24 +52,9 @@ namespace libvmtrace
 			std::shared_ptr<SystemMonitor> sm;
 			vmi_event_t interrupt_event;
 			std::vector<vmi_event_t> step_events;
+			std::vector<BPEventData> event_data;
 			std::unordered_map<addr_t, breakpoint> bp;
 			bool disabled{}, extended{};
-	};
-
-	struct BPEventData
-	{
-		unsigned int vcpu;
-		x86_registers_t regs;
-		breakpoint* bp;
-		uint16_t slat_id;
-		void* raw_event;
-		addr_t paddr;
-		BreakpointMechanism* bpm;
-
-		bool beforeSingleStep = true;
-		addr_t ripAfterSingleStep;
-		std::string proc_name;
-		int pid;
 	};
 }
 

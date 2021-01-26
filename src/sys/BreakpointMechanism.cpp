@@ -24,13 +24,18 @@ namespace libvmtrace
 		vmi_register_event(guard.get(), &interrupt_event);
 		
 		// setup step events.
-		for (auto i = 0; i < vmi_get_num_vcpus(guard.get()); i++)
+		const auto num_cpus = vmi_get_num_vcpus(guard.get());
+		event_data.resize(num_cpus);
+		step_events.resize(num_cpus);
+		for (auto i = 0; i < num_cpus; i++)
 		{
-			vmi_event_t step_event;
-			SETUP_SINGLESTEP_EVENT(&step_event, 1u << i, HandleStepEvent, false);
-			step_event.data = nullptr;
-			step_events.push_back(step_event);
-			vmi_register_event(guard.get(), &step_events[i]);
+			auto& ev = event_data[i];
+			auto& step = step_events[i];
+			ev.bpm = this;
+			ev.vcpu = i;
+			SETUP_SINGLESTEP_EVENT(&step, 1u << i, HandleStepEvent, false);
+			step.data = &event_data.back();
+			vmi_register_event(guard.get(), &step);
 		}
 	}
 
@@ -158,7 +163,8 @@ namespace libvmtrace
 			}
 		}
 
-		const auto patch = std::make_shared<Patch>(addr, pbp ? pbp->GetPid() : 0, ALL_VCPU, patch_bytes, kernel_space);
+		const auto patch = std::make_shared<Patch>(pbp ? ev->GetAddr() : addr,
+			pbp ? pbp->GetPid() : 0, ALL_VCPU, patch_bytes, kernel_space);
 		if (patch && !sm->GetInjectionStrategy()->Apply(patch))
 			throw std::runtime_error("Failed to apply patch!");
 
@@ -213,9 +219,7 @@ namespace libvmtrace
 	{
 		const auto instance = reinterpret_cast<BreakpointMechanism*>(event->data);
 
-		auto bpd = new BPEventData();
-		bpd->bpm = instance;
-		bpd->vcpu = event->vcpu_id;
+		auto bpd = (BPEventData*) &instance->event_data[event->vcpu_id];
 		memcpy(&bpd->regs, event->x86_regs, sizeof(x86_registers_t));
 		event->interrupt_event.reinject = true;
 
@@ -232,17 +236,16 @@ namespace libvmtrace
 					return 0;
 
 				bpd->bp = &b->second;
+				bpd->beforeSingleStep = true;
+
 				if (b->second.event->callback(bpd))
 				{
 					instance->sm->GetInjectionStrategy()->Undo(b->second.patch);
 					b->second.patch = nullptr;
-
-					delete bpd;
 					return 0;
 				}
 			
 				bpd->beforeSingleStep = false;
-				instance->step_events[event->vcpu_id].data = reinterpret_cast<void*>(bpd);
 
 				// short-circuit if the INT3 replaced a NOP.
 				if (bpd->bp->nop)
@@ -271,13 +274,17 @@ namespace libvmtrace
 	event_response_t BreakpointMechanism::HandleStepEvent(vmi_instance_t vmi, vmi_event_t* event)
 	{
 		const auto bpd = reinterpret_cast<BPEventData*>(event->data);
-		auto response = VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
+		auto response = 0;
 
-		if (bpd && bpd->bpm && bpd->bp)
+		if (!bpd || !bpd->bpm)
+			return response;
+
+		if (bpd->bp)
 		{
 			const auto bpm = bpd->bpm;
 			const auto bp = bpd->bp;
 			const auto remove = bp->event && bp->event->callback(bpd);
+			response |= VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
 
 			// in case we ever want to trap to the monitor on the singlestep.
 			if (bpm->extended)
@@ -295,8 +302,7 @@ namespace libvmtrace
 			else if (!bpm->disabled && bp->patch && !remove)
 				bpm->sm->GetInjectionStrategy()->Apply(bp->patch);
 
-			delete bpd;
-			event->data = nullptr;
+			bpd->bp = nullptr;
 		}
 
 		return response;
