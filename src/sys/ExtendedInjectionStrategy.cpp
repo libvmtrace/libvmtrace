@@ -383,7 +383,7 @@ namespace libvmtrace
 
 		// no synchronization for kernel threads.
 		addr_t dtb;
-		if (patch->pid == 0 || vmi_pid_to_dtb(guard.get(), patch->pid, &dtb) != VMI_SUCCESS || !sm->GetBPM())
+		if (patch->pid == 0 || patch->virt == ~0ull || vmi_pid_to_dtb(guard.get(), patch->pid, &dtb) != VMI_SUCCESS || !sm->GetBPM())
 			return true;
 
 		// build a list of all intersections.

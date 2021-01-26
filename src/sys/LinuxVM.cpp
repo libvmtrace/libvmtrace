@@ -790,7 +790,6 @@ namespace libvmtrace
 					if (sys != _SyscallEvents64.end() && sys->second && sys->second->callback((void*) s))
 						_SyscallEvents64.erase(sys);
 				}
-
 				delete s;
 			}
 		}
