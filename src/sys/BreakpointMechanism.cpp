@@ -258,7 +258,7 @@ namespace libvmtrace
 				{
 					event->next_slat_id = bpd->slat_id = event->slat_id;
 					event->slat_id = 0;
-					return VMI_EVENT_RESPONSE_SLAT_ID | (/*(b->second.event && b->second.event->IsFast())*/true ?
+					return VMI_EVENT_RESPONSE_SLAT_ID | ((b->second.event && b->second.event->IsFast()) ?
 							VMI_EVENT_RESPONSE_NEXT_SLAT_ID : // here we don't get the step event.
 							VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP); // and here we do.
 				}
