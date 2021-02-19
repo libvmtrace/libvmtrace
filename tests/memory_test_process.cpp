@@ -8,6 +8,7 @@
 #include <spdlog/async.h>
 
 #include <vector>
+#include <array>
 #include <chrono>
 
 using namespace std;
@@ -18,12 +19,17 @@ namespace spd = spdlog;
 
 std::shared_ptr<SystemMonitor> sm;
 std::shared_ptr<LinuxVM> vm;
+std::array<uint64_t, 300> cnt;
 
 static void close_handler(int sig)
 {
 	cerr << "Sending kill signal, please wait a few seconds" << endl;
 	vm = nullptr;
 	sm = nullptr;
+	std::cout << "Caught system calls:" << std::endl;
+	for (auto i = 0; i < 300; i++)
+		if (cnt[i] > 0)
+			std::cout << std::dec << i << ": " << cnt[i] << std::endl;
 	exit(sig);
 }
 
@@ -35,7 +41,7 @@ class TestListener : public EventListener
 		
 		bool callback(const Event* ev, void* data)
 		{
-			const SyscallEvent* sev = dynamic_cast<const SyscallEvent*>(ev);
+			const auto sev = dynamic_cast<const SyscallEvent*>(ev);
 			if (sev)
 			{
 				time_t currentTime = chrono::system_clock::now().time_since_epoch() / chrono::milliseconds(1);
@@ -50,9 +56,11 @@ class TestListener : public EventListener
 			if (sys)
 			{
 				const auto vmi = sm->Lock();
+				cnt[sys->GetNr()]++;
 				std::cout << "Got syscall from " << std::dec << sys->GetPid(vmi) << std::endl;
 				sm->Unlock();
 			}
+
 			return false;
 		}
 	private:
@@ -105,6 +113,7 @@ int main(int argc, char* argv[])
 	// SyscallEvent* read = new SyscallEvent(0, *testListener, false, false, true);
 
 	vector<SyscallEvent> events;
+	cnt.fill(0);
 
 	for(int i = 1 ; i <= 300 ; i++)
 	{

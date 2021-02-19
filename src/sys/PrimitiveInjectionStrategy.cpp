@@ -15,23 +15,20 @@ namespace libvmtrace
 		patch->original.resize(patch->data.size());
 
 		// are we patching virtual memory inside a process?
-		if (patch->pid != 0)
+		if (patch->pid != 0 && patch->virt != ~0ull)
 		{
-			if (vmi_read_va(guard.get(), patch->location, patch->pid, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
-				return false;
+			addr_t location_pa;
+			if (vmi_translate_uv2p(guard.get(), patch->location, patch->pid, &location_pa) != VMI_SUCCESS)
+				throw std::runtime_error("Failed to translate patch location.");
+			patch->virt = patch->location;
+			patch->location = location_pa;
+		}
 
-			if (vmi_write_va(guard.get(), patch->location, patch->pid, patch->data.size(), patch->data.data(), nullptr) != VMI_SUCCESS)
-				return false;
-		}
-		// or are we patching a physical memory address?
-		else
-		{
-			if (vmi_read_pa(guard.get(), patch->location, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
-				return false;
-			
-			if (vmi_write_pa(guard.get(), patch->location, patch->data.size(), patch->data.data(), nullptr) != VMI_SUCCESS)
-				return false;
-		}
+		if (vmi_read_pa(guard.get(), patch->location, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
+			return false;
+
+		if (vmi_write_pa(guard.get(), patch->location, patch->data.size(), patch->data.data(), nullptr) != VMI_SUCCESS)
+			return false;
 
 		return InjectionStrategy::Apply(patch);
 	}
@@ -41,15 +38,8 @@ namespace libvmtrace
 		assert(patch->original.size() == patch->data.size());
 		LockGuard guard(sm);
 
-		// are we patching virtual memory inside a process?
-		if (patch->pid != 0)
-		{
-			if (vmi_write_va(guard.get(), patch->location, patch->pid, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
-				return false;
-		}
-		// or are we patching a physical memory address?
-		else if (vmi_write_pa(guard.get(), patch->location, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
-				return false;
+		if (vmi_write_pa(guard.get(), patch->location, patch->original.size(), patch->original.data(), nullptr) != VMI_SUCCESS)
+			return false;
 
 		return InjectionStrategy::UndoPatch(patch);
 	}

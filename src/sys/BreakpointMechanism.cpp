@@ -34,7 +34,7 @@ namespace libvmtrace
 			ev.bpm = this;
 			ev.vcpu = i;
 			SETUP_SINGLESTEP_EVENT(&step, 1u << i, HandleStepEvent, false);
-			step.data = &event_data.back();
+			step.data = &ev;
 			vmi_register_event(guard.get(), &step);
 		}
 	}
@@ -87,7 +87,7 @@ namespace libvmtrace
 
 		// check if we can short-circuit nops.
 		auto is_nop = false;
-		if (extended)
+		if (extended && !ev->IsFast())
 		{
 			uint8_t instr[3];
 			if (vmi_read_pa(guard.get(), addr, 3, instr, nullptr) != VMI_SUCCESS)

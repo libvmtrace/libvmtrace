@@ -216,6 +216,7 @@ namespace libvmtrace
 	event_response_t ExtendedInjectionStrategy::HandleSchedulerEvent(vmi_instance_t vmi, vmi_event_t* event)
 	{
 		const auto instance = reinterpret_cast<ExtendedInjectionStrategy*>(event->data);
+
 		vmi_pid_t pid;
 
 		if (instance->coordinated)
@@ -224,15 +225,17 @@ namespace libvmtrace
 		// disable altp2m on other processes.
 		event->slat_id = 0;
 
-		if (!instance->decommissioned &&
-			vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) == VMI_SUCCESS)
-		{
-			auto patch = std::find_if(instance->patches.begin(), instance->patches.end(),
-				[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid || p->pid == 0; });
+		if (instance->decommissioned)
+			return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 
-			if (patch != instance->patches.end())
-				event->slat_id = instance->view_x[event->vcpu_id];
-		}
+		if (vmi_dtb_to_pid(vmi, event->reg_event.value, &pid) != VMI_SUCCESS)
+			pid = 0;
+
+		auto patch = std::find_if(instance->patches.begin(), instance->patches.end(),
+			[&pid](std::shared_ptr<Patch>& p) -> bool { return p->pid == pid || p->pid == 0; });
+
+		if (patch != instance->patches.end())
+			event->slat_id = instance->view_x[event->vcpu_id];
 
 		return VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 	}
@@ -367,7 +370,7 @@ namespace libvmtrace
 
 			// unmap the sink in r/w view.
 			if (vmi_slat_change_gfn(guard.get(), view_rw, shadow_page->execute, ~addr_t(0)) != VMI_SUCCESS)
-					throw std::runtime_error("Failed to unmap shadow page from EPT.");
+				throw std::runtime_error("Failed to unmap shadow page from EPT.");
 
 			FreePage(shadow_page->execute);
 			shadow_pages.erase(shadow_page);
