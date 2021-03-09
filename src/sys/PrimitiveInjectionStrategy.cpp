@@ -15,7 +15,7 @@ namespace libvmtrace
 		patch->original.resize(patch->data.size());
 
 		// are we patching virtual memory inside a process?
-		if (patch->pid != 0 && patch->virt != ~0ull)
+		if (patch->pid != 0 && patch->virt <= 0)
 		{
 			addr_t location_pa;
 			if (vmi_translate_uv2p(guard.get(), patch->location, patch->pid, &location_pa) != VMI_SUCCESS)
