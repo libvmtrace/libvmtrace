@@ -111,6 +111,11 @@ namespace libvmtrace
 	protected:
 		virtual bool UndoPatch(std::shared_ptr<Patch> patch)
 		{
+			const auto it = std::find(patches.begin(), patches.end(), patch);
+
+			if (it != patches.end())
+				patches.erase(it);
+
 			return true;
 		}
 
