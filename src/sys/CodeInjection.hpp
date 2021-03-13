@@ -165,7 +165,7 @@ namespace libvmtrace
 		bool decommissioned{};
 
 		// paramters for injection.
-		bool hide{}, coordinated = true;
+		bool hide{};
 
 		// we need these for now until the xc wrappers are in libvmi upstream.
 		uint64_t vmid;

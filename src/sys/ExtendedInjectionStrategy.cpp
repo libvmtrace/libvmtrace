@@ -26,13 +26,14 @@ namespace libvmtrace
 		// enable altp2m support.
 		EnableAltp2m();
 
+#ifndef XEN_ENABLE_FAST_SWITCHING
 		// setup scheduler events.
-		if (!coordinated)
 		{
 			SETUP_REG_EVENT(&scheduler_event, CR3, VMI_REGACCESS_W, false, HandleSchedulerEvent);
 			scheduler_event.data = this;
 			vmi_register_event(guard.get(), &scheduler_event);
 		}
+#endif // XEN_ENABLE_FAST_SWITCHING
 
 		// we need to register the memory event even on coordinated injection,
 		// because vmi_set_mem_event has a sanity check that prevents us from setting
@@ -93,8 +94,9 @@ namespace libvmtrace
 		}
 
 		// remove event handler.
-		if (coordinated)
+#ifndef XEN_ENABLE_FAST_SWITCHING
 			vmi_clear_event(vmi, &scheduler_event, nullptr);
+#endif // XEN_ENABLE_FAST_SWITCHING
 		vmi_clear_event(vmi, &mem_event, nullptr);
 
 		// remove all custom views.
@@ -219,8 +221,9 @@ namespace libvmtrace
 
 		vmi_pid_t pid;
 
-		if (instance->coordinated)
-			return 0;
+#ifdef XEN_ENABLE_FAST_SWITCHING
+		return 0;
+#endif // XEN_ENABLE_FAST_SWITCHING
 
 		// disable altp2m on other processes.
 		event->slat_id = 0;
@@ -314,12 +317,13 @@ namespace libvmtrace
 					|| vmi_set_mem_event(guard.get(), shadow_page->execute, VMI_MEMACCESS_RW, view) != VMI_SUCCESS)
 					throw std::runtime_error("Failed to enable memory events for x view.");
 
+#ifdef XEN_ENABLE_FAST_SWITCHING
 				// activate fast switching.
-				if (coordinated)
 				{
 					const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
 					xc_altp2m_add_fast_switch(xc, vmid, vind, dtb, view_rw, view);
 				}
+#endif // XEN_ENABLE_FAST_SWITCHING
 			}
 
 			// remap the affected page to sink in r/w view.
@@ -361,11 +365,12 @@ namespace libvmtrace
 				if (vmi_slat_change_gfn(guard.get(), view, shadow_page->read_write, ~addr_t(0)) != VMI_SUCCESS)
 					throw std::runtime_error("Failed to unmap shadow page from EPT.");
 
-				if (coordinated)
+#ifdef XEN_ENABLE_FAST_SWITCHING
 				{
 					const auto vind = std::distance(view_x.begin(), std::find(view_x.begin(), view_x.end(), view));
 					xc_altp2m_remove_fast_switch(xc, vmid, vind, dtb);
 				}
+#endif // XEN_ENABLE_FAST_SWITCHING
 			}
 
 			// unmap the sink in r/w view.
