@@ -28,6 +28,11 @@ include_directories (${GLIB_INCLUDE_DIR}
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 	${CMAKE_CURRENT_SOURCE_DIR}/apps/plugins)
 
+# our own options
+IF(XEN_ENABLE_FAST_SWITCHING)
+	ADD_DEFINITIONS(-DXEN_ENABLE_FAST_SWITCHING)
+ENDIF(XEN_ENABLE_FAST_SWITCHING)
+
 # bring in all the dependencies
 include (ExternalProject)
 ExternalProject_Add(libvmi
