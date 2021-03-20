@@ -6,7 +6,30 @@ compiler: gcc
 before_install:
     - sudo apt-get update -q
 install:
-    - sudo apt-get install -y -q libnetfilter-queue-dev libpcap-dev g++ libboost-all-dev automake libtool git libglib2.0-dev g++ libjson-c-dev libxen-dev byacc make netcat libelf-dev libssl-dev flex libdwarf-dev cmake flex bison libglib2.0-dev libvirt-dev libjson-c-dev libyajl-dev colormake libssh-dev libcurl4-openssl-dev uuid-dev
+    - sudo apt-get install -y -q libnetfilter-queue-dev libpcap-dev g++ libboost-all-dev automake libtool git libglib2.0-dev g++ libjson-c-dev byacc make netcat libelf-dev libssl-dev flex libdwarf-dev cmake flex bison libglib2.0-dev libvirt-dev libjson-c-dev libyajl-dev colormake libssh-dev libcurl4-openssl-dev uuid-dev
+    # ubuntu 20.04 is still stuck on xen 4.11
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxentoolcore1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxentoolcore1_4.14.1+11-gb0b734a8b3-1_amd64.deb 
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxentoollog1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxentoollog1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxencall1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxencall1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxendevicemodel1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxendevicemodel1_4.14.1+11-gb0b734a8b3-1_amd64.deb 
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxenevtchn1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxenevtchn1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxenforeignmemory1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxenforeignmemory1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxengnttab1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxengnttab1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxenstore3.0_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxenstore3.0_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxenhypfs1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxenhypfs1_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxenmisc4.14_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxenmisc4.14_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - wget http://ftp.debian.org/debian/pool/main/x/xen/libxen-dev_4.14.1+11-gb0b734a8b3-1_amd64.deb
+    - sudo dpkg -i libxen-dev_4.14.1+11-gb0b734a8b3-1_amd64.deb
 script:
     - git submodule update --init
     - mkdir build
