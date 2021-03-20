@@ -24,10 +24,8 @@ set (util_files
 	util/utils.cpp
 	util/ProcessCache.cpp
 	util/Logging.cpp
-	util/KafkaLogger.cpp
 	util/ElasticLogger.cpp
-	util/Controller.cpp
-	util/KafkaCommander.cpp)
+	util/Controller.cpp)
 
 set (net_files
 	net/IPv4Addr.cpp
@@ -41,7 +39,6 @@ set (net_files
 
 set (agent linux_agent.o)
 add_library (vmtrace ${sys_files} ${util_files} ${net_files} ${agent})
-target_include_directories (vmtrace PUBLIC ${CMAKE_BINARY_DIR}/librdkafka-prefix/include)
 set_source_files_properties (${agent} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 
 add_executable (linux_file_extraction_agent agent/LinuxFileExtractionAgent.cpp)
@@ -55,7 +52,7 @@ add_custom_command(TARGET linux_file_extraction_agent
 	VERBATIM)
 
 add_dependencies (vmtrace linux_file_extraction_agent)
-add_dependencies (linux_file_extraction_agent libvmi librdkafka libdwarfparser)
+add_dependencies (linux_file_extraction_agent libvmi libdwarfparser)
 
 install (TARGETS vmtrace DESTINATION lib)
 install (DIRECTORY "${CMAKE_SOURCE_DIR}/src/" DESTINATION include/libvmtrace FILES_MATCHING PATTERN "*.hpp")

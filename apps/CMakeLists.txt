@@ -7,7 +7,6 @@ set (apps_files
 	code_section_integrity.cpp
 	code_section_integrity_binary.cpp
 	csec.cpp
-	dingfest.cpp
 	git_detect.cpp
 	saracenia.cpp
 	saracenia2.cpp

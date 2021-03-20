@@ -32,11 +32,9 @@
 
 #include "util/ProcessCache.hpp"
 #include "util/Logging.hpp"
-#include "util/KafkaLogger.hpp"
 #include "util/ElasticLogger.hpp"
 #include "util/Plugin.hpp"
 #include "util/Controller.hpp"
-#include "util/KafkaCommander.hpp"
 #include "util/PeriodicTimer.hpp"
 
 #include "util/Setting.hpp"

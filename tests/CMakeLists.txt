@@ -7,7 +7,6 @@ set (test_files
 	static_test.cpp
 	static_test_injection.cpp
 	static_test_elf_injection.cpp
-	static_test_kafka_commander.cpp
 	static_test_elasticsearch.cpp
 	static_test_agent_presence.cpp
 	static_test_file_extraction.cpp

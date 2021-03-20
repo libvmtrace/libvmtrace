@@ -10,6 +10,3 @@
 [submodule "contrib/libvmi"]
 	path = contrib/libvmi
 	url = https://github.com/libvmi/libvmi.git
-[submodule "contrib/librdkafka"]
-	path = contrib/librdkafka
-	url = https://github.com/edenhill/librdkafka

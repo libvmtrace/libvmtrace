@@ -43,10 +43,6 @@ ExternalProject_Add(libdwarfparser
 	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libdwarfparser
 	CONFIGURE_COMMAND ./autogen.sh && ./configure LDFLAGS=-L${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib CPPFLAGS=${libdwarfparser_flags} --prefix=<INSTALL_DIR>
 	BUILD_IN_SOURCE 1)
-ExternalProject_Add(librdkafka
-	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/librdkafka
-	CONFIGURE_COMMAND ./configure --prefix=<INSTALL_DIR>
-	BUILD_IN_SOURCE 1)
 
 # dependencies between the dependencies...
 add_dependencies (libdwarfparser libvmi)
@@ -58,7 +54,6 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib
 
 # add the dependencies to the rpath
 set_property(GLOBAL PROPERTY INSTALL_RPATH "${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib;
-	${CMAKE_CURRENT_BINARY_DIR}/librdkafka-prefix/lib;
 	${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib")
 set_property(GLOBAL PROPERTY BUILD_WITH_INSTALL_RPATH ON)
 
@@ -74,7 +69,6 @@ link_libraries (ssl
 	pcap
 	netfilter_queue
 	elf
-	rdkafka++
 	dwarf
 	dwarfparser
 	vmiwrapper
