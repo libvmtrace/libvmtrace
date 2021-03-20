@@ -80,7 +80,7 @@ namespace libvmtrace
 	void SystemMonitor::ProcessEvents()
 	{
 		const auto future = worker_exit.get_future();
-		while (future.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout)
+		while (future.wait_for(std::chrono::seconds(0)) == std::future_status::timeout)
 		{
 			vmi_mtx.lock();
 			if (vmi_events_listen(vmi, 0) != VMI_SUCCESS)

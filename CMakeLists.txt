@@ -56,6 +56,12 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib
 	${CMAKE_CURRENT_BINARY_DIR}/librdkafka-prefix/lib
 	${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib)
 
+# add the dependencies to the rpath
+set_property(GLOBAL PROPERTY INSTALL_RPATH "${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib;
+	${CMAKE_CURRENT_BINARY_DIR}/librdkafka-prefix/lib;
+	${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib")
+set_property(GLOBAL PROPERTY BUILD_WITH_INSTALL_RPATH ON)
+
 link_libraries (ssl
 	ssh
 	crypto
