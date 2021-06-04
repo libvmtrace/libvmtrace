@@ -37,11 +37,10 @@ namespace libvmtrace
 	std::string SyscallJson::ExtractBuf(vmi_instance_t vmi, addr_t ptr, size_t size)
 	{
 		char* buf = nullptr;
-		access_context_t ctx;
-
-		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+		ACCESS_CONTEXT(ctx,
+			.translate_mechanism = VMI_TM_PROCESS_DTB,
+			.addr = ptr);
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		ctx.addr = ptr;
 
 		buf = new char[size];
 
@@ -141,15 +140,15 @@ namespace libvmtrace
 
 	void SyscallJson::ToJsonBind(vmi_instance_t vmi, addr_t sockaddr) 
 	{
-		access_context_t ctx;
 		uint16_t sport;
 
 		struct sockaddr sa;
 		struct sockaddr_in* caster = (struct sockaddr_in*)&sa;
 
-		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+		ACCESS_CONTEXT(ctx,
+			.translate_mechanism = VMI_TM_PROCESS_DTB,
+			.addr = sockaddr);
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		ctx.addr = sockaddr;
 
 		size_t read = 0;
 		vmi_read(vmi, &ctx, sizeof(struct sockaddr), &sa, &read);
@@ -173,14 +172,14 @@ namespace libvmtrace
 
 	void SyscallJson::ToJsonConnect(vmi_instance_t vmi, addr_t socka) 
 	{
-		access_context_t ctx;
 		uint16_t sport;
 
 		struct sockaddr sa;
 
-		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+		ACCESS_CONTEXT(ctx,
+			.translate_mechanism = VMI_TM_PROCESS_DTB,
+			.addr = socka);
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		ctx.addr = socka;
 
 		size_t read = 0;
 		vmi_read(vmi, &ctx, sizeof(struct sockaddr), &sa, &read);

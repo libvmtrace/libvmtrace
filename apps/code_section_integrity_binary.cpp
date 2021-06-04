@@ -84,9 +84,9 @@ void process_hash(vmi_instance_t vmi, LinuxVM& linux)
 
 			vector<vm_area> maps = linux.GetMMaps(*it);
 
-			access_context_t _ctx_dtb;
-			_ctx_dtb.translate_mechanism = VMI_TM_PROCESS_DTB;
-			_ctx_dtb.dtb = (*it).GetDtb();
+			ACCESS_CONTEXT(_ctx_dtb,
+				.translate_mechanism = VMI_TM_PROCESS_DTB,
+				.dtb = it->GetDtb());
 
 			bool allresolved = true;
 
