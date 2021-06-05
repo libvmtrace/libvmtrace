@@ -66,6 +66,7 @@ namespace helpers
 		public:
 			SSHHelper(const std::string binary_path, const std::string ip) : _binary_path(binary_path), _ip(ip)
 			{
+				_ctx_dtb.version = ACCESS_CONTEXT_VERSION;
 				_ctx_dtb.translate_mechanism = VMI_TM_PROCESS_DTB;
 			};
 			
@@ -135,7 +136,7 @@ namespace helpers
 			const std::string _ip;
 			ssh_session _ssh_session;
 
-			access_context_t _ctx_dtb;
+			access_context_t _ctx_dtb{};
 
 			PageFaultListener _pfl;
 	};

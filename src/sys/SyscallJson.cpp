@@ -8,14 +8,12 @@ namespace libvmtrace
 
 	std::string SyscallJson::ExtractString(vmi_instance_t vmi, addr_t ptr) 
 	{
-		access_context_t ctx;
 		char* buf = nullptr;
 
-		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+		ACCESS_CONTEXT(ctx,
+			.translate_mechanism = VMI_TM_PROCESS_DTB,
+			.addr = ptr);
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		// ctx.dtb &= ~0x1fff;
-
-		ctx.addr = ptr;
 
 		buf = vmi_read_str(vmi, &ctx);
 		if (buf == nullptr)
@@ -99,8 +97,8 @@ namespace libvmtrace
 
 	void SyscallJson::ToJsonExecve(vmi_instance_t vmi)
 	{
-		access_context_t ctx;
-		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+		ACCESS_CONTEXT(ctx,
+			.translate_mechanism = VMI_TM_PROCESS_DTB);
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
 
 		std::string path = ExtractString(vmi, SyscallBasic::GetParameter(0));
@@ -258,12 +256,12 @@ namespace libvmtrace
 	void SyscallJson::ToJsonCompat_Socketcall(vmi_instance_t vmi)
 	{
 		// http://lxr.free-electrons.com/source/net/socket.c?v=3.16
-		access_context_t ctx;
 		addr_t sockaddr = 0;
 
-		ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+		ACCESS_CONTEXT(ctx,
+			.translate_mechanism = VMI_TM_PROCESS_DTB,
+			.addr = SyscallBasic::GetParameter(1)+1*4);
 		ctx.dtb = SyscallBasic::GetRegisters().cr3;
-		ctx.addr = SyscallBasic::GetParameter(1)+1*4;
 
 		vmi_read_32 (vmi, &ctx, (uint32_t*)&sockaddr);
 
