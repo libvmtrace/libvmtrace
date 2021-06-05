@@ -68,8 +68,12 @@ namespace util
 			return "ERR: plugin " + plugin + " not found";
 
 		std::cout << "Execute " << plugin << " " << command << " param : [";
-		for (auto p : params) 
-			std::cout << p << ", ";
+		for (auto i = 0; i < params.size(); i++)
+		{
+			std::cout << params[i];
+			if (i != params.size() - 1)
+				std::cout << ", ";
+		}
 		std::cout << "]" << std::endl;
 
 		return it->second.ExecuteCommand(command, params, command_id, vm_id);
