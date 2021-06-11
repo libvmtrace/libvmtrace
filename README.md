@@ -11,6 +11,9 @@ Libvmtrace was used for the following research papers:
 * DroidKex: Fast Extraction of Ephemeral TLS Keys from the Memory of Android Apps
 * Architecture for Resource-Aware VMI-based Cloud Malware Analysis
 * Sarracenia: Enhancing the Performance and Stealthiness of SSH Honeypots Using Virtual Machine Introspection
+* VMIGuard: Detecting and Preventing Service Integrity Violations by Malicious Insiders Using Virtual Machine Introspection
+* Agent-Based File Extraction Using Virtual Machine Introspection
+* RapidVMI: Fast and multi-core aware active virtual machine introspection
 
 [![Build status](https://travis-ci.org/libvmtrace/libvmtrace.svg?branch=master)](https://travis-ci.org/libvmtrace/libvmtrace)
 
@@ -55,16 +58,16 @@ make dist
 sudo make install
 
 # enable optimizations
-cmake .. -DXEN_ENABLE_FAST_SWITCHING
+cmake .. -DXEN_ENABLE_FAST_SWITCHING=ON
 ```
 
-Linux kernels above version 4.4 (built with CONFIG_SYSCALL_PTREGS)
+Linux kernels above version 4.4
 ==================================================================
 
-If the guest uses a kernel with this feature enabled, system calls can only be monitored when libvmtrace is built as follows.
+If the guest uses a kernel with ```CONFIG_SYSCALL_PTREGS``` enabled, libvmtrace must be built as follows.
 
 ```
-cmake .. -DINTROSPECT_PTREGS
+cmake .. -DINTROSPECT_PTREGS=ON
 ```
 
 Linux File Extraction Agent
