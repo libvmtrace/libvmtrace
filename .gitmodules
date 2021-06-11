@@ -10,3 +10,7 @@
 [submodule "contrib/libvmi"]
 	path = contrib/libvmi
 	url = https://github.com/libvmi/libvmi.git
+[submodule "xen"]
+	path = xen
+	url = https://github.com/thomasdangl/xen.git
+	branch = stable-4.14
