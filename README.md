@@ -34,10 +34,37 @@ Installation
 git clone https://github.com/libvmtrace/libvmtrace
 
 # download dependencies
-cd libvmtrace && git submodule update --init
+cd libvmtrace
+git submodule update --init contrib/rapidjson
+git submodule update --init contrib/spdlog
+git submodule update --init contrib/libdwarfparser
+git submodule update --init contrib/libvmi
 
 # build the library and examples
 mkdir -p build && cd build && cmake .. && make
+```
+
+XEN hypervisor optimizations
+============================
+
+```
+# install xen
+git submodule update --init xen
+cd xen
+make dist
+sudo make install
+
+# enable optimizations
+cmake .. -DXEN_ENABLE_FAST_SWITCHING
+```
+
+Linux kernels above version 4.4 (built with CONFIG_SYSCALL_PTREGS)
+==================================================================
+
+If the guest uses a kernel with this feature enabled, system calls can only be monitored when libvmtrace is built as follows.
+
+```
+cmake .. -DINTROSPECT_PTREGS
 ```
 
 Linux File Extraction Agent
