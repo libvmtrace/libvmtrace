@@ -52,7 +52,6 @@ add_dependencies (libdwarfparser libvmi)
 
 # add the dependencies to the linker path
 link_directories (${CMAKE_CURRENT_BINARY_DIR}/libdwarfparser-prefix/lib
-	${CMAKE_CURRENT_BINARY_DIR}/librdkafka-prefix/lib
 	${CMAKE_CURRENT_BINARY_DIR}/libvmi-prefix/lib)
 
 # add the dependencies to the rpath
@@ -85,3 +84,10 @@ add_subdirectory (apps)
 if (NOT ${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
 	execute_process (COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/compile_commands.json ${CMAKE_SOURCE_DIR}/compile_commands.json)
 endif ()
+
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/contrib/libvmi/libvmi" DESTINATION include/libvmi FILES_MATCHING PATTERN "*.h")
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/contrib/rapidjson/include/rapidjson" DESTINATION include/rapidjson FILES_MATCHING PATTERN "*.h")
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/contrib/libdwarfparser/libdwarfparser" DESTINATION include/libdwarfparser FILES_MATCHING PATTERN "*.h")
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/contrib/spdlog/include/spdlog" DESTINATION include/spdlog FILES_MATCHING PATTERN "*.h")
+install (DIRECTORY "${CMAKE_SOURCE_DIR}/apps/plugins" DESTINATION include/libvmtrace FILES_MATCHING PATTERN "*.hpp")
+
