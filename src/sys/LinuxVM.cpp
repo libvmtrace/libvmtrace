@@ -720,9 +720,8 @@ namespace libvmtrace
 		cout << "Process syscall : " << ev->GetName() << " before single step ? " << bpd->beforeSingleStep << endl;
 #endif
 
-		// unsure if we still need this with the instruction rewriting.
-		//if (bpd->beforeSingleStep && !bpd->bp->nop)
-		//	return false;
+		if (bpd->beforeSingleStep && !bpd->bp->nop)
+			return false;
 
 		if (ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
 		{
