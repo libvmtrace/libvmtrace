@@ -107,8 +107,8 @@ namespace libvmtrace
 		vmi_get_kernel_struct_offset(vmi,"vm_area_struct","vm_next",&_vm_next_offset);
 
 		vmi_get_kernel_struct_offset(vmi,"task_struct", "thread",&_thread_struct_offset);
+		vmi_get_kernel_struct_offset(vmi,"task_struct", "stack",&_stack_offset);
 		vmi_get_kernel_struct_offset(vmi,"thread_struct", "sp",&_sp_offset);
-		vmi_get_kernel_struct_offset(vmi,"thread_struct", "sp0",&_sp0_offset);
 		vmi_get_kernel_struct_offset(vmi,"pt_regs", "sp",&_sp_on_pt_regs_offset);
 		vmi_get_kernel_struct_offset(vmi,"pt_regs", "ip",&_ip_on_pt_regs_offset);
 
@@ -197,11 +197,31 @@ namespace libvmtrace
 		vmi_read_addr_va(vmi, mm+_exe_file_offset, 0, &tmp5);
 		string path = d_path(tmp5 + _f_path_offset, vmi);
 
-		addr_t sp0, ip;
-		vmi_read_addr_va(vmi, current_process + _thread_struct_offset + _sp0_offset, 0, &sp0);
-		vmi_read_addr_va(vmi, sp0 + _ip_on_pt_regs_offset - 0xA8, 0, &ip);
-
+		addr_t ip = IpFromTask(vmi, current_process);
 		return Process(current_process, pid, dtb, name, path, parent_pid, uid, pwd, ip);
+	}
+
+	addr_t LinuxVM::IpFromTask(vmi_instance_t vmi, addr_t task) const
+	{
+		addr_t ptr = 0;
+		if (vmi_read_addr_va(vmi, task + _stack_offset, 0, &ptr) != VMI_SUCCESS)
+		{
+			std::cerr << "Failed to read stack." << std::endl;
+			return 0;
+		}
+
+		// arch/x86/include/asm/processor.h - task_pt_regs
+		addr_t ptr_pt_regs = ptr + ((1ul << 12) << (2 + 0)) - 0 - sizeof(pt_regs);
+		addr_t pt_regs_ip;
+
+		//find the next instruction address that about to be executed
+		if (vmi_read_addr_va(vmi, ptr_pt_regs + _ip_on_pt_regs_offset, 0, &pt_regs_ip) != VMI_SUCCESS)
+		{
+			std::cerr << "Failed to read pt_regs_ip." << std::endl;
+			return 0;
+		}
+
+		return pt_regs_ip;
 	}
 
 	vector<Process> LinuxVM::GetProcessList(void)
@@ -1360,25 +1380,7 @@ namespace libvmtrace
 		_last_code_injection = &*it3;
 		vmi_pid_t pid = (*it3).target_pid;
 		addr_t task = (*it3).task_struct;
-
-		//https://stackoverflow.com/questions/25253231/context-of-linux-kernel-threads
-		addr_t sp0 = 0;
-		vmi_read_addr_va(vmi, task + _thread_struct_offset + _sp0_offset, 0, &sp0);
-
-		/* README
-		* arch/x86/include/asm/processor.h  - line 927
-		*
-		* The macro #define task_pt_regs(tsk)	((struct pt_regs *)(tsk)->thread.sp0 - 1)
-		* returns a pointer to the struct pt_regs of the given task. However, be aware
-		* of the semantic of the above macro (c pointer arithmetic), it subtracts
-		* sizeof(struct pt_regs) = 168 (0xa8) rather than -1 from tsk.thread.sp0.
-		*
-		*/
-		addr_t ptr_pt_regs = (sp0-0xa8);
-		addr_t pt_regs_ip;
-
-		//find the next instruction address that about to be executed
-		vmi_read_addr_va(vmi, ptr_pt_regs + _ip_on_pt_regs_offset, 0, &pt_regs_ip);
+		addr_t pt_regs_ip = IpFromTask(vmi, task);
 
 		switch (type)
 		{

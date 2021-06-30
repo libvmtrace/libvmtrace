@@ -25,10 +25,6 @@ namespace libvmtrace
 					this, std::placeholders::_1, std::placeholders::_2));
 		last_chance_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_last_chance,
 					this, std::placeholders::_1, std::placeholders::_2));
-
-		vmi_get_kernel_struct_offset(guard.get(), "task_struct", "thread", &offsets.thread_struct);
-		vmi_get_kernel_struct_offset(guard.get(), "thread_struct", "sp0", &offsets.sp0);
-		vmi_get_kernel_struct_offset(guard.get(), "pt_regs", "ip", &offsets.ip);
 	}
 
 	Process LinuxELFInjector::inject_executable(std::shared_ptr<std::vector<uint8_t>> executable)
@@ -110,7 +106,7 @@ namespace libvmtrace
 		// TODO: temporary fix until we have the injection strategies
 		// and EPTP switching ready. fixes the issue with shared pages
 		// across different processes on single vcpu systems.
-		if (pid != child->GetPid())
+		if (pid != child->GetPid() && vmi_event->reg_event.value != child->GetDtb())
 		{
 			// restore original page.
 			if (!stored_bytes.empty() && start > 0 && vmi_write_va(guard.get(), start, child->GetPid(),
@@ -162,7 +158,7 @@ namespace libvmtrace
 		// page table duplication is not done yet when the first cr3 changes happen,
 		// ideally we want a hook in the kernel to notify us when we are ready,
 		// but this will have to do for now.
-		if (page_loop < 0x10)
+		if (page_loop < 0x100)
 		{
 			page_loop++;
 			return false;
@@ -173,16 +169,9 @@ namespace libvmtrace
 		refresh_child(child->GetPid());
 		assert(child->GetDtb() != parent.GetDtb());
 
-		// get user-mode stack pointer.
-		addr_t stack_ptr{};
-		if (vmi_read_addr_va(guard.get(), child->GetTaskStruct() + offsets.thread_struct + offsets.sp0,
-					0, &stack_ptr) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to retrieve user-mode stack pointer.");
-
 		// access registers and find the to-be instruction pointer of the thread on process entry.
-		addr_t pt_regs_ptr = stack_ptr - 0xA8; // TODO: maybe get this offset dynamically?
-		addr_t ip{};
-		if (vmi_read_addr_va(guard.get(), pt_regs_ptr + offsets.ip, 0, &ip) != VMI_SUCCESS)
+		addr_t ip = vm->IpFromTask(guard.get(), child->GetTaskStruct());
+		if (!ip)
 			throw std::runtime_error("Failed to get instruction pointer at thread execution.");
 
 		// this calculation is a bit sketchy, in theory the displaced instruction pointer might

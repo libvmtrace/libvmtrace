@@ -84,7 +84,6 @@ namespace libvmtrace
 
 		struct
 		{
-			addr_t thread_struct, sp0, ip;
 			uint32_t execveat_index = 322;
 		} offsets;
 	

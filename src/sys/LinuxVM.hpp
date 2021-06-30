@@ -102,6 +102,7 @@ namespace libvmtrace
 
         	Process GetCurrentProcess(addr_t current_process) const;
 		std::vector<Process> GetProcessList();
+		addr_t IpFromTask(vmi_instance_t vmi, addr_t task) const;
 		std::vector<net::NetworkConnection> GetNetworkConnections(const Process& p, const ConnectionType type);
 		std::vector<OpenFile> GetOpenFiles(const Process& p, int filterfd = -1) const;
 		std::vector<vm_area> GetMMaps(const Process& p);
@@ -145,7 +146,7 @@ namespace libvmtrace
 		addr_t _vm_end_offset, _vm_flags_offset, _vm_file_offset, _vm_pgoff_offset, _vm_next_offset, _exe_file_offset;
 		addr_t _code_start_offset, _code_end_offset;
 
-		addr_t _thread_struct_offset, _sp_offset, _sp0_offset, _sp_on_pt_regs_offset, _ip_on_pt_regs_offset, _current_task_offset;
+		addr_t _stack_offset, _thread_struct_offset, _sp_offset, _sp_on_pt_regs_offset, _ip_on_pt_regs_offset, _current_task_offset;
 		addr_t _socket_type_offset, _socket_family;
 
 		std::string d_path(addr_t path, vmi_instance_t vmi) const;

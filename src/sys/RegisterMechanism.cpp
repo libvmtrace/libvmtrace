@@ -75,12 +75,12 @@ namespace libvmtrace
 	{
 		const auto instance = (RegisterMechanism*) event->data;
 		LockGuard guard(instance->sm);
+		event->reg_event.value &= ~0x1FFF;
 		for (auto it = instance->reg_events.begin(); it != instance->reg_events.end();)
 			if (*it && (*it)->callback(event))
 				it = instance->reg_events.erase(it);
 			else
 				it++;
-		std::cout << "reg ev!\n";
 		return 0;
 	}
 }
