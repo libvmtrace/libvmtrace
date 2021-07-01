@@ -41,7 +41,7 @@ namespace libvmtrace
 namespace file_extraction
 {
 	// constructor of the file extraction class.
-	LinuxFileExtractor::LinuxFileExtractor(const std::shared_ptr<SystemMonitor> sm, const std::shared_ptr<LinuxVM> vm,
+	LinuxFileExtractor::LinuxFileExtractor(std::shared_ptr<SystemMonitor>& sm, LinuxVM* vm,
 			const Process process, const std::string agent_path, const bool skip_tree)
 		: sm(sm), vm(vm), base(0), process(process), pid(process.GetPid())
 	{
@@ -50,7 +50,7 @@ namespace file_extraction
 	}
 
 	// constructor of the file extraction class.
-	LinuxFileExtractor::LinuxFileExtractor(const std::shared_ptr<SystemMonitor> sm, const std::shared_ptr<LinuxVM> vm,
+	LinuxFileExtractor::LinuxFileExtractor(std::shared_ptr<SystemMonitor>& sm, LinuxVM* vm,
 			const Process process, std::vector<uint8_t>& agent, const bool skip_tree)
 		: sm(sm), vm(vm), base(0), process(process), pid(process.GetPid())
 	{

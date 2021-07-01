@@ -123,6 +123,9 @@ namespace libvmtrace
 	{
 		LockGuard guard(_sm);
 
+		if (_code_injections.size() > 0)
+			_sm->GetRM()->RemoveRegisterEvent(_process_change);
+
 		for (vector<CodeInjection>::iterator it = _code_injections.begin() ; it != _code_injections.end();)
 		{
 			if ((*it).type == PAGE_FAULT)
@@ -1765,7 +1768,7 @@ namespace libvmtrace
 				std::shared_ptr<std::vector<uint8_t>>{}, &executable);
 		
 		// pass it into the wrapping class.
-		LinuxELFInjector elf(_sm, shared_from_this(), p);
+		LinuxELFInjector elf(_sm, this, p);
 		return elf.inject_executable(exe);
 	}
 	
@@ -1786,7 +1789,7 @@ namespace libvmtrace
 		std::vector<uint8_t> agent;
 		agent.assign(linux_agent_start, linux_agent_end);
 		const auto child = InjectELF(p, agent);
-		LinuxFileExtractor extractor(_sm, shared_from_this(), child, agent);
+		LinuxFileExtractor extractor(_sm, this, child, agent);
 
 		// request the file and dump it onto local filesystem.
 		extractor.request_file(file);

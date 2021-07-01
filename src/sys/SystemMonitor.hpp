@@ -95,7 +95,7 @@ namespace libvmtrace
 			bool ept_support;
 			
 			vmi_instance_t vmi;
-			std::recursive_mutex vmi_mtx;
+			std::recursive_mutex vmi_mtx{};
 
 			std::shared_ptr<BreakpointMechanism> bpm;
 			std::shared_ptr<RegisterMechanism> rm;

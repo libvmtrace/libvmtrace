@@ -12,7 +12,7 @@ namespace libvmtrace
 {
 	using namespace util;
 
-	LinuxELFInjector::LinuxELFInjector(std::shared_ptr<SystemMonitor>& sm, std::shared_ptr<LinuxVM> vm,
+	LinuxELFInjector::LinuxELFInjector(std::shared_ptr<SystemMonitor>& sm, LinuxVM* vm,
 				Process parent) : sm(sm), vm(vm), parent(parent), finished(false)
 	{
 		LockGuard guard(sm);
@@ -25,6 +25,17 @@ namespace libvmtrace
 					this, std::placeholders::_1, std::placeholders::_2));
 		last_chance_listener = std::make_unique<injection_listener>(*this, std::bind(&LinuxELFInjector::on_last_chance,
 					this, std::placeholders::_1, std::placeholders::_2));
+	}
+
+	LinuxELFInjector::~LinuxELFInjector()
+	{
+		try
+		{
+			sm->GetRM()->RemoveRegisterEvent(cr3_change.get());
+			sm->GetBPM()->RemoveBreakpoint(mmap_break.get());
+			sm->GetBPM()->RemoveBreakpoint(last_chance_break.get());
+		}
+		catch (std::runtime_error& e) {	}
 	}
 
 	Process LinuxELFInjector::inject_executable(std::shared_ptr<std::vector<uint8_t>> executable)
@@ -136,8 +147,12 @@ namespace libvmtrace
 			// detach ourselves once we have completed the injection.
 			if (executed && ++page_loop > 200)
 			{
-				sm->GetBPM()->RemoveBreakpoint(mmap_break.get());
-				sm->GetBPM()->RemoveBreakpoint(last_chance_break.get());
+				try
+				{
+					sm->GetBPM()->RemoveBreakpoint(mmap_break.get());
+					sm->GetBPM()->RemoveBreakpoint(last_chance_break.get());
+				}
+				catch (std::runtime_error& e) {	}
 
 				// write back original instructions.
 				// note that we don't have to take the instruction pointer into account,

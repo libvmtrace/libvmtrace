@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 		const auto exe = std::make_shared<std::vector<uint8_t>>(
 				std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 
-		LinuxELFInjector inj(sm, vm, *process);
+		LinuxELFInjector inj(sm, vm.get(), *process);
 		const auto child = inj.inject_executable(exe);
 		std::cout << "Forked child: " << std::dec << child.GetPid() << std::endl;
 	}

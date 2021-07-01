@@ -102,7 +102,8 @@ namespace libvmtrace
 		};
 
 	public:
-		LinuxELFInjector(std::shared_ptr<SystemMonitor>& sm, std::shared_ptr<LinuxVM> vm, Process parent);
+		LinuxELFInjector(std::shared_ptr<SystemMonitor>& sm, LinuxVM* vm, Process parent);
+		~LinuxELFInjector();
 		Process inject_executable(std::shared_ptr<std::vector<uint8_t>> executable);
 
 	private:
@@ -116,7 +117,7 @@ namespace libvmtrace
 			mmap_listener, last_chance_listener;
 
 		std::shared_ptr<SystemMonitor>& sm;
-		std::shared_ptr<LinuxVM> vm;
+		LinuxVM* vm;
 		
 		Process parent;
 		std::unique_ptr<Process> child;

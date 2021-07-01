@@ -13,9 +13,9 @@ namespace file_extraction
 	class LinuxFileExtractor
 	{
 	public:
-		LinuxFileExtractor(std::shared_ptr<SystemMonitor> sm, std::shared_ptr<LinuxVM> vm,
+		LinuxFileExtractor(std::shared_ptr<SystemMonitor>& sm, LinuxVM* vm,
 				Process process, const std::string agent_path, const bool skip_tree = true);
-		LinuxFileExtractor(std::shared_ptr<SystemMonitor> sm, std::shared_ptr<LinuxVM> vm,
+		LinuxFileExtractor(std::shared_ptr<SystemMonitor>& sm, LinuxVM* vm,
 				Process process, std::vector<uint8_t>& agent, const bool skip_tree = true);
 		virtual ~LinuxFileExtractor();
 
@@ -35,8 +35,8 @@ namespace file_extraction
 		void set_flag(status s);
 		bool wait_for_flag(status s);	
 
-		std::shared_ptr<SystemMonitor> sm;
-		std::shared_ptr<LinuxVM> vm;
+		std::shared_ptr<SystemMonitor>& sm;
+		LinuxVM* vm;
 		addr_t base;
 		Process process;
 		vmi_pid_t pid;

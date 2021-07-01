@@ -74,7 +74,7 @@ int main(int argc, char** argv)
 		agent.assign(linux_agent_start, linux_agent_end);
 		const auto child = vm->InjectELF(*process, agent);
 		const auto should_skip = true;
-		extractor = std::make_unique<LinuxFileExtractor>(sm, vm, child, agent, should_skip);
+		extractor = std::make_unique<LinuxFileExtractor>(sm, vm.get(), child, agent, should_skip);
 		
 		// helper lambda to wrap extraction and status indicator of file download.
 		const auto read_file = [](const std::string& name)
