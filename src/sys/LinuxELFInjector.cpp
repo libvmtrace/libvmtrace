@@ -12,7 +12,7 @@ namespace libvmtrace
 {
 	using namespace util;
 
-	LinuxELFInjector::LinuxELFInjector(std::shared_ptr<SystemMonitor> sm, std::shared_ptr<LinuxVM> vm,
+	LinuxELFInjector::LinuxELFInjector(std::shared_ptr<SystemMonitor>& sm, std::shared_ptr<LinuxVM> vm,
 				Process parent) : sm(sm), vm(vm), parent(parent), finished(false)
 	{
 		LockGuard guard(sm);

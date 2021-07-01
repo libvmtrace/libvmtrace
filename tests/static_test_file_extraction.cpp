@@ -17,8 +17,8 @@ std::unique_ptr<LinuxFileExtractor> extractor;
 void shutdown(int sig)
 {
 	extractor = nullptr;
-	sm = nullptr;
 	vm = nullptr;
+	sm = nullptr;
 
 	exit(sig);
 }
