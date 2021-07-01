@@ -31,9 +31,13 @@ namespace libvmtrace
 	{
 		try
 		{
+			LockGuard guard(sm);
 			sm->GetRM()->RemoveRegisterEvent(cr3_change.get());
 			sm->GetBPM()->RemoveBreakpoint(mmap_break.get());
 			sm->GetBPM()->RemoveBreakpoint(last_chance_break.get());
+			if (!stored_bytes.empty() && !finished && start > 0)
+				vmi_write_va(guard.get(), start, child->GetPid(),
+					stored_bytes.size(), stored_bytes.data(), nullptr);
 		}
 		catch (std::runtime_error& e) {	}
 	}
