@@ -124,7 +124,7 @@ namespace libvmtrace
 		LockGuard guard(_sm);
 
 		if (_code_injections.size() > 0)
-			_sm->GetRM()->RemoveRegisterEvent(_process_change);
+			_sm->GetRM()->AttemptRemoveRegisterEvent(_process_change);
 
 		for (vector<CodeInjection>::iterator it = _code_injections.begin() ; it != _code_injections.end();)
 		{
@@ -1169,7 +1169,7 @@ namespace libvmtrace
 
 					if(_code_injections.size() == 0)
 					{
-						_sm->GetRM()->RemoveRegisterEvent(_process_change);
+						_sm->GetRM()->AttemptRemoveRegisterEvent(_process_change);
 					}
 
 					return true;
@@ -1311,7 +1311,7 @@ namespace libvmtrace
 				_last_code_injection = nullptr;
 
 			if(_code_injections.size() == 0)
-				_sm->GetRM()->RemoveRegisterEvent(_process_change);
+				_sm->GetRM()->AttemptRemoveRegisterEvent(_process_change);
 
 			return true;
 		}
@@ -1837,7 +1837,7 @@ namespace libvmtrace
 			return VMI_FAILURE;
 		}
 		
-		_sm->GetRM()->RemoveRegisterEvent(&ev);
+		_sm->GetRM()->AttemptRemoveRegisterEvent(&ev);
 		return VMI_SUCCESS;
 	}
 

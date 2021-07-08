@@ -32,12 +32,12 @@ namespace libvmtrace
 		try
 		{
 			LockGuard guard(sm);
-			sm->GetRM()->RemoveRegisterEvent(cr3_change.get());
+			using namespace std::chrono_literals;
+			sm->GetRM()->AttemptRemoveRegisterEvent(cr3_change.get());
 			sm->GetBPM()->RemoveBreakpoint(mmap_break.get());
 			sm->GetBPM()->RemoveBreakpoint(last_chance_break.get());
 			if (!stored_bytes.empty() && !finished && start > 0)
-				vmi_write_va(guard.get(), start, child->GetPid(),
-					stored_bytes.size(), stored_bytes.data(), nullptr);
+				vmi_write_pa(guard.get(), start, stored_bytes.size(), stored_bytes.data(), nullptr);
 		}
 		catch (std::runtime_error& e) {	}
 	}
@@ -118,38 +118,32 @@ namespace libvmtrace
 		dup2(fd, fileno(stdout));
 		close(fd);
 
+		if (!stored_bytes.empty() && pid == child->GetPid()
+			&& vmi_event->reg_event.value != child->GetDtb())
+		{
+			vmi_v2pcache_flush(guard.get(), ~0ull);
+			refresh_child(child->GetPid());
+		}
+
 		// TODO: temporary fix until we have the injection strategies
 		// and EPTP switching ready. fixes the issue with shared pages
 		// across different processes on single vcpu systems.
-		if (pid != child->GetPid() && vmi_event->reg_event.value != child->GetDtb())
+		if (vmi_event->reg_event.value != child->GetDtb())
 		{
 			// restore original page.
-			if (!stored_bytes.empty() && start > 0 && vmi_write_va(guard.get(), start, child->GetPid(),
-					stored_bytes.size(), stored_bytes.data(), nullptr) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to restore original page!");
+			if (!stored_bytes.empty() && start > 0)
+			{
+				if (vmi_write_pa(guard.get(), start, stored_bytes.size(), stored_bytes.data(), nullptr) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to restore original page!");
+				needs_restore = true;
+			}
 
 			return false;
 		}
 		else if (!stored_bytes.empty())
 		{
-			// transfer the shellcode first.
-			if (vmi_write_va(guard.get(), start, child->GetPid(), shellcode.size,
-						const_cast<char*>(shellcode.data), nullptr) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to restore shellcode to target process.");
-
-			// write the size of executable at the start of the shellcode.
-			auto exec_size = static_cast<uint64_t>(executable->size());
-			if (vmi_write_64_va(guard.get(), start, child->GetPid(), &exec_size) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to restore executable size.");
-
-			// reinsert breakpoint.
-			const auto last_chance_va = start + 0xD7;
-			uint8_t int3 = 0xCC;
-			if (vmi_write_8_va(guard.get(), last_chance_va, child->GetPid(), &int3) != VMI_SUCCESS)
-				throw std::runtime_error("Failed to restore breakpoint.");
-
 			// detach ourselves once we have completed the injection.
-			if (executed && ++page_loop > 200)
+			if (executed && ++count > 200)
 			{
 				try
 				{
@@ -163,12 +157,32 @@ namespace libvmtrace
 				// because the syscall will not return on success.
 				// we need to restore the original instructions because the same physical
 				// memory might be mapped into multiple processes.
-				if (vmi_write_va(guard.get(), start, child->GetPid(), stored_bytes.size(),
+				if (vmi_write_pa(guard.get(), start, stored_bytes.size(),
 							stored_bytes.data(), nullptr) != VMI_SUCCESS)
 					throw std::runtime_error("Failed to restore original instructions.");
 
 				finished = true;
 				return true;
+			}
+
+			if (needs_restore)
+			{
+				// transfer the shellcode first.
+				if (vmi_write_pa(guard.get(), start, shellcode.size,
+						const_cast<char*>(shellcode.data), nullptr) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to restore shellcode to target process.");
+
+				// write the size of executable at the start of the shellcode.
+				auto exec_size = static_cast<uint64_t>(executable->size());
+				if (vmi_write_64_pa(guard.get(), start, &exec_size) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to restore executable size.");
+
+				// reinsert breakpoint.
+				uint8_t int3 = 0xCC;
+				if (vmi_write_8_pa(guard.get(), last_chance, &int3) != VMI_SUCCESS)
+					throw std::runtime_error("Failed to restore breakpoint.");
+
+				needs_restore = false;
 			}
 
 			return false;
@@ -177,16 +191,10 @@ namespace libvmtrace
 		// page table duplication is not done yet when the first cr3 changes happen,
 		// ideally we want a hook in the kernel to notify us when we are ready,
 		// but this will have to do for now.
-		if (page_loop < 0x100)
-		{
-			page_loop++;
-			return false;
-		}
-
-		// guest os scheduler just context switched our vcpu, clear out the cache.
 		vmi_v2pcache_flush(guard.get(), ~0ull);
 		refresh_child(child->GetPid());
-		assert(child->GetDtb() != parent.GetDtb());
+		if (child->GetDtb() == parent.GetDtb())
+			return false;
 
 		// access registers and find the to-be instruction pointer of the thread on process entry.
 		addr_t ip = vm->IpFromTask(guard.get(), child->GetTaskStruct());
@@ -197,33 +205,31 @@ namespace libvmtrace
 		// be outside of the allocation bounds. however because most linkers position both the .text
 		// section and each function with a certain alignment, this should never happen.
 		// let's assume this holds true and store off the code at the specified offset.
-		start = ip - shellcode.displacement;
+		if (vmi_translate_uv2p(guard.get(), ip, child->GetPid(), &start) != VMI_SUCCESS)
+			return false;
+		start -= shellcode.displacement;
 		stored_bytes.resize(shellcode.size);
-		if (vmi_read_va(guard.get(), start, child->GetPid(), shellcode.size,
-					stored_bytes.data(), nullptr) != VMI_SUCCESS)
-			throw std::runtime_error("Failed to store off instructions at the offsetted pointer.");
+		if (vmi_read_pa(guard.get(), start, shellcode.size, stored_bytes.data(), nullptr) != VMI_SUCCESS)
+			return false;
 
 		// determine at which address the interrupt will occur.
-		const auto mmap_va = start + shellcode.interrupt_mmap;
-		const auto last_chance_va = start + 0xD7;
-		if (vmi_translate_uv2p(guard.get(), mmap_va, child->GetPid(), &mmap) != VMI_SUCCESS
-				|| vmi_translate_uv2p(guard.get(), last_chance_va, child->GetPid(), &last_chance) != VMI_SUCCESS)
-			throw std::runtime_error("Could not translate virtual interrupt addresses to physical memory.");
+		mmap = start + shellcode.interrupt_mmap;
+		last_chance = start + shellcode.interrupt_lc;
 
 		// transfer the shellcode first.
-		if (vmi_write_va(guard.get(), start, child->GetPid(), shellcode.size,
+		if (vmi_write_pa(guard.get(), start, shellcode.size,
 					const_cast<char*>(shellcode.data), nullptr) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to write shellcode to target process.");
 
 		// write the size of executable at the start of the shellcode.
 		auto exec_size = static_cast<uint64_t>(executable->size());
-		if (vmi_write_64_va(guard.get(), start, child->GetPid(), &exec_size) != VMI_SUCCESS)
+		if (vmi_write_64_pa(guard.get(), start, &exec_size) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to write executable size.");
 
 		// everything in its place, set up callback for the interrupts the shellcode will trigger.
-		mmap_break = std::make_unique<ProcessBreakpointEvent>("MMAP BP", 0, mmap, *mmap_listener);
+		mmap_break = std::make_unique<BreakpointEvent>("MMAP BP", mmap, *mmap_listener);
 		sm->GetBPM()->InsertBreakpoint(mmap_break.get());
-		last_chance_break = std::make_unique<ProcessBreakpointEvent>("LAST CHANCE BP", 0, last_chance, *last_chance_listener);
+		last_chance_break = std::make_unique<BreakpointEvent>("LAST CHANCE BP", last_chance, *last_chance_listener);
 		sm->GetBPM()->InsertBreakpoint(last_chance_break.get());
 		return false;
 	}
@@ -254,7 +260,7 @@ namespace libvmtrace
 		mapped = true;
 		return true;
 	}
-	
+
 	bool LinuxELFInjector::on_last_chance(const Event* event, void* data)
 	{
 		LockGuard guard(sm);
@@ -262,7 +268,6 @@ namespace libvmtrace
 		//debug_cpu(guard.get(), child->GetPid(), bp_event); 
 
 		executed = true;
-		page_loop = 0;
 		return true;
 	}
 

@@ -40,21 +40,47 @@ namespace libvmtrace
 		SetRegisterEvent(true);
 	}
 
-	void RegisterMechanism::RemoveRegisterEvent(const ProcessChangeEvent* ev)
+	bool RegisterMechanism::RemoveRegisterEvent(const ProcessChangeEvent* ev)
 	{
-		reg_events.erase(std::remove(reg_events.begin(), reg_events.end(), ev), reg_events.end());
-		if (reg_events.empty()) SetRegisterEvent(false);
+		if (reg_events.size() == 1 && reg_events[0] == ev)
+		{
+			if (!SetRegisterEvent(false))
+				return false;
+
+			reg_events.clear();
+		}
+		else
+			reg_events.erase(std::remove(reg_events.begin(), reg_events.end(), ev), reg_events.end());
+		return true;
 	}
 
-	void RegisterMechanism::SetRegisterEvent(const bool value)
+	void RegisterMechanism::AttemptRemoveRegisterEvent(const ProcessChangeEvent* ev)
+	{
+		if (std::find(to_remove.begin(), to_remove.end(), ev) == to_remove.end())
+			to_remove.push_back(ev);
+	}
+
+	void RegisterMechanism::FinalizeEvents()
+	{
+		for (auto it = to_remove.begin(); it != to_remove.end();)
+			if (RemoveRegisterEvent(reinterpret_cast<const ProcessChangeEvent*>(*it)))
+				it = to_remove.erase(it);
+			else
+				++it;
+	}
+
+	bool RegisterMechanism::SetRegisterEvent(const bool value)
 	{
 		LockGuard guard(sm);
 
 		if (!!register_event.data == value)
-			return;
+			return true;
 
 		if (vmi_pause_vm(guard.get()) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to pause VM.");
+
+		if (vmi_are_events_pending(guard.get()) != 0)
+			return false;
 
 		if (value)
 		{
@@ -69,6 +95,8 @@ namespace libvmtrace
 
 		if (vmi_resume_vm(guard.get()) != VMI_SUCCESS)
 			throw std::runtime_error("Failed to resume VM.");
+
+		return true;
 	}
 
 	event_response_t RegisterMechanism::HandleRegisterEvent(vmi_instance_t vmi, vmi_event_t* event)
@@ -76,11 +104,12 @@ namespace libvmtrace
 		const auto instance = (RegisterMechanism*) event->data;
 		LockGuard guard(instance->sm);
 		event->reg_event.value &= ~0x1FFF;
-		for (auto it = instance->reg_events.begin(); it != instance->reg_events.end();)
-			if (*it && (*it)->callback(event))
-				it = instance->reg_events.erase(it);
-			else
-				it++;
+		for (auto it = instance->reg_events.begin(); it != instance->reg_events.end(); it++)
+		{
+			const auto rm = std::find(instance->to_remove.begin(), instance->to_remove.end(), *it) != instance->to_remove.end();
+			if (*it && !rm && (*it)->callback(event))
+				instance->to_remove.push_back(*it);
+		}
 		return 0;
 	}
 }

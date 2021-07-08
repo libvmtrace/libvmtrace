@@ -14,15 +14,18 @@ namespace libvmtrace
 			~RegisterMechanism();
 
 			void InsertRegisterEvent(const ProcessChangeEvent* ev);
-			void RemoveRegisterEvent(const ProcessChangeEvent* ev);
+			void AttemptRemoveRegisterEvent(const ProcessChangeEvent* ev);
+			void FinalizeEvents();
 
 		private:
-			void SetRegisterEvent(const bool value);
+			bool SetRegisterEvent(const bool value);
+			bool RemoveRegisterEvent(const ProcessChangeEvent* ev);
 			static event_response_t HandleRegisterEvent(vmi_instance_t vmi, vmi_event_t *event);
 
 			std::shared_ptr<SystemMonitor> sm;
 			vmi_event_t register_event;
-			std::vector<const RegEvent*> reg_events;
+			std::vector<const RegEvent*> reg_events{};
+			std::vector<const RegEvent*> to_remove{};
 	};
 }
 

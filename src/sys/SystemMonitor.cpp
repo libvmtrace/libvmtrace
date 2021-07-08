@@ -85,6 +85,7 @@ namespace libvmtrace
 			vmi_mtx.lock();
 			if (vmi_events_listen(vmi, 0) != VMI_SUCCESS)
 				std::cerr << "Error waiting for events, quitting..." << std::endl;
+			rm->FinalizeEvents();
 			vmi_mtx.unlock();
 		}
 	}

@@ -80,6 +80,7 @@ namespace libvmtrace
 			size_t size = 0xD9;
 			size_t displacement = 0x18;
 			size_t interrupt_mmap = 0x8B;
+			size_t interrupt_lc = 0xD7;
 		} shellcode{};
 
 		struct
@@ -123,11 +124,11 @@ namespace libvmtrace
 		std::unique_ptr<Process> child;
 		std::shared_ptr<std::vector<uint8_t>> executable;
 		addr_t start, mmap, last_chance;
-		uint32_t page_loop{};
 		std::vector<uint8_t> stored_bytes{};
 		std::unique_ptr<ProcessChangeEvent> cr3_change;
-		std::unique_ptr<ProcessBreakpointEvent> mmap_break, last_chance_break;
-		std::atomic<bool> forked{}, mapped{}, executed{}, finished{};
+		std::unique_ptr<BreakpointEvent> mmap_break, last_chance_break;
+		std::atomic<bool> forked{}, mapped{}, executed{}, finished{}, needs_restore{};
+		std::atomic<uint32_t> count{};
 	};
 }
 
