@@ -222,6 +222,11 @@ namespace libvmtrace
 		auto bpd = (BPEventData*) &instance->event_data[event->vcpu_id];
 		memcpy(&bpd->regs, event->x86_regs, sizeof(x86_registers_t));
 		event->interrupt_event.reinject = true;
+		
+		// Slow, but KVM needs this one.
+		vmi_pagecache_flush(vmi);
+		vmi_v2pcache_flush(vmi, ~0ull);
+		vmi_pidcache_flush(vmi);
 
 		if (vmi_pagetable_lookup(vmi, event->x86_regs->cr3,
 					event->interrupt_event.gla, &bpd->paddr) == VMI_SUCCESS)
@@ -229,7 +234,7 @@ namespace libvmtrace
 			const auto b = instance->bp.find(bpd->paddr);
 		
 			if (b != instance->bp.end())
-			{	
+			{
 				event->interrupt_event.reinject = false;
 				
 				if (!b->second.patch)

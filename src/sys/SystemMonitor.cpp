@@ -7,7 +7,7 @@ namespace libvmtrace
 {
 	using namespace std::chrono_literals;
 
-	SystemMonitor::SystemMonitor(const std::string name, const bool event_support, const bool ept_support) noexcept(false) :
+	SystemMonitor::SystemMonitor(const std::string name, const bool event_support, const bool ept_support, const char* socketPath) noexcept(false) :
 		name(name), event_support(event_support), worker(nullptr), profile(""), ept_support(ept_support)
 	{
 		// dirty trick to prevent shared_from_this from throwing a bad weak ptr.
@@ -19,7 +19,19 @@ namespace libvmtrace
 		if (event_support)
 			init_flags = VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS;
 
-		if (vmi_init_complete(&vmi, (void*) name.c_str(), init_flags, nullptr,
+		vmi_init_data_t *init_data = NULL;
+#ifdef ENABLE_KVMI
+		if(socketPath != nullptr) {
+			init_data = (vmi_init_data_t*)malloc(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
+			init_data->count = 1;
+			init_data->entry[0].type = VMI_INIT_DATA_KVMI_SOCKET;
+			init_data->entry[0].data = strdup(socketPath);
+		}
+		else {
+			throw std::runtime_error("KVMI requires socket path");
+		}
+#endif // ENABLE_KVMI
+		if (vmi_init_complete(&vmi, (void*) name.c_str(), init_flags, init_data,
 					VMI_CONFIG_GLOBAL_FILE_ENTRY, nullptr, nullptr) == VMI_FAILURE)
 			throw std::runtime_error("Failed to init VMI.");
 
@@ -56,7 +68,9 @@ namespace libvmtrace
 		if (worker)
 		{
 			worker_exit.set_value();
+			//vmi_mtx.unlock();
 			worker->join();
+			//vmi_mtx.lock();
 			worker = nullptr;
 		}
 
@@ -85,7 +99,8 @@ namespace libvmtrace
 			vmi_mtx.lock();
 			if (vmi_events_listen(vmi, 0) != VMI_SUCCESS)
 				std::cerr << "Error waiting for events, quitting..." << std::endl;
-			rm->FinalizeEvents();
+			if (rm)
+				rm->FinalizeEvents();
 			vmi_mtx.unlock();
 		}
 	}

@@ -24,7 +24,7 @@ namespace libvmtrace
 	{
 		public:
 			SystemMonitor(const std::string name, const bool event_support,
-					const bool ept_support = false) noexcept(false);
+					const bool ept_support = false, const char* socketPath = nullptr) noexcept(false);
 			~SystemMonitor() noexcept(false);
 
 			status_t Init();
