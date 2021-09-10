@@ -10,7 +10,8 @@ set (apps_files
 	git_detect.cpp
 	saracenia.cpp
 	saracenia2.cpp
-	ssh_key_extraction.cpp)
+	ssh_key_extraction.cpp
+	sshbasic.cpp)
 
 set (helper_files ssh_helper/SSHHelper.cpp)
 

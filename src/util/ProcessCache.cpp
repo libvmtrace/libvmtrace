@@ -16,70 +16,45 @@ namespace libvmtrace
 	const Process& ProcessCache::GetProcessFromDtb(const addr_t dtb)
 	{
 		addr_t dtb1 = dtb & ~0x1fff;
-		bool found = false;
 
 		{
 			lock_guard<recursive_mutex> lock(_lock);
 			for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
 			{
-				if((*it).GetDtb() == dtb || (*it).GetDtb() == dtb1)
-				{
-					found = true;
-					return (*it);
-				}
+				if(it->GetDtb() == dtb || it->GetDtb() == dtb1)
+					return *it;
 			}
 		}
 		
-		if(!found)
+		lock_guard<recursive_mutex> lock(_lock);
+		UpdateList();
+		for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
 		{
-			UpdateList();
-			
-			{
-				lock_guard<recursive_mutex> lock(_lock);
-				for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
-				{
-					if((*it).GetDtb() == dtb || (*it).GetDtb() == dtb1)
-					{
-						return (*it);
-					}
-				}
-			}
+			if(it->GetDtb() == dtb || it->GetDtb() == dtb1)
+				return *it;
 		}
-
+		
 		throw runtime_error("could not find process");
 	}
 
 	const Process& ProcessCache::GetProcessFromPid(const vmi_pid_t pid)
 	{
-		bool found = false;
-
 		{
 			lock_guard<recursive_mutex> lock(_lock);
 			for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
 			{
-				if((*it).GetPid() == pid)
-				{
-					found = true;
+				if(it->GetPid() == pid)
 					return (*it);
-				}
 			}
 		}
 		
 
-		if(!found)
+		lock_guard<recursive_mutex> lock(_lock);
+		UpdateList();
+		for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
 		{
-			UpdateList();
-
-			{
-				lock_guard<recursive_mutex> lock(_lock);
-				for(vector<Process>::iterator it = _processes.begin() ; it != _processes.end(); ++it)
-				{
-					if((*it).GetPid() == pid)
-					{
-						return (*it);
-					}
-				}
-			}
+			if(it->GetPid() == pid)
+				return (*it);
 		}
 
 		throw runtime_error("could not find process");
@@ -88,7 +63,7 @@ namespace libvmtrace
 	const Process& ProcessCache::GetProcessFromDtbAndRefreshIf(const addr_t dtb, const string name)
 	{
 		const Process& p = GetProcessFromDtb(dtb);
-		if(p.GetName() == name)
+		if (p.GetName() == name)
 		{
 			UpdateList();
 
@@ -96,9 +71,7 @@ namespace libvmtrace
 			return p2;
 		}
 		else
-		{
 			return p;
-		}
 	}
 
 	const Process& ProcessCache::GetProcessFromPidAndRefreshIf(const vmi_pid_t pid, const string name)
@@ -112,9 +85,7 @@ namespace libvmtrace
 			return p2;
 		}
 		else
-		{
 			return p;
-		}
 	}
 
 	const Process& ProcessCache::GetProcessFromTCPConnection(const net::NetworkConnection* con)

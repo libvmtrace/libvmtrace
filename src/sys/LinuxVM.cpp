@@ -244,7 +244,7 @@ namespace libvmtrace
 		//auto start = std::chrono::high_resolution_clock::now();
 		next_list_entry = list_head;
 		// vmi_pidcache_flush(vmi);
-		vmi_pause_vm(vmi);
+		// vmi_pause_vm(vmi);
 		do
 		{
 			current_process = next_list_entry - _tasks_offset;
@@ -263,7 +263,7 @@ namespace libvmtrace
 			}
 		}
 		while(next_list_entry != list_head);
-		vmi_resume_vm(vmi);
+		// vmi_resume_vm(vmi);
 		//auto end = std::chrono::high_resolution_clock::now();
 		//auto dur = end - start;
 		//auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
@@ -648,7 +648,6 @@ namespace libvmtrace
 					mmap.access += "x";
 			}
 			
-			vmi_read_64_va(vmi, vm_area_ptr+_vm_pgoff_offset, 0, &mmap.pg_off);
 			if (vmi_read_64_va(vmi, vm_area_ptr+_vm_file_offset, 0, &vm_file) == VMI_FAILURE)
 			{
 				throw runtime_error("Could not read vm_file");
@@ -657,9 +656,11 @@ namespace libvmtrace
 			if(vm_file == 0)
 			{
 				mmap.path = string("");
+				mmap.pg_off = 0;
 			}
 			else
 			{
+				vmi_read_64_va(vmi, vm_area_ptr+_vm_pgoff_offset, 0, &mmap.pg_off);
 				mmap.path = string(d_path((addr_t)(vm_file + _f_path_offset), vmi));
 			}
 
@@ -745,7 +746,7 @@ namespace libvmtrace
 
 		if (bpd->beforeSingleStep && !bpd->bp->nop)
 			return false;
-
+		
 		if (ev->GetNr() != 56 && ev->GetType() == BEFORE_CALL)
 		{
 			addr_t rip_pa = 0;
@@ -759,19 +760,25 @@ namespace libvmtrace
 			auto ret_required = false;
 
 			if (ev->Is32bit())
+			{
 				for (auto& e : _SyscallEvents32)
 					if (e.first == ev->GetNr() && e.second->WithRet())
 					{
 						ret_required = true;
 						break;
 					}
+			}
 			else
+			{
 				for (auto& e : _SyscallEvents64)
+				{
 					if (e.first == ev->GetNr() && e.second->WithRet())
 					{
 						ret_required = true;
 						break;
 					}
+				}
+			}
 
 			SyscallBasic* s = nullptr;
 
@@ -785,9 +792,11 @@ namespace libvmtrace
 				s = new SyscallBasic(vmi, vcpu, true, ev->Is32bit(), ret_required, regs);
 				// s->PreProcess(*this, ev->GetNr(), vmi);
 			}
-
+			
 			s->PreProcess(*this, ev->GetNr(), vmi);
 
+			// Keep this disabled for now.
+#if 0
 			if (ev->GetNr() != 59 && (ret_required || s->PageFault()))
 			{
 				addr_t paddr = 0;
@@ -798,7 +807,8 @@ namespace libvmtrace
 				
 				_sm->GetBPM()->InsertBreakpoint(bp2);
 			} 
-			else 
+			else
+#endif
 			{
 				if (ev->Is32bit())
 				{
@@ -813,10 +823,13 @@ namespace libvmtrace
 						_SyscallEvents64.erase(sys);
 				}
 				delete s;
+				return false;
 			}
 		}
 		else if (ev->GetType() == AFTER_CALL)
 		{
+			return false;
+
 			SyscallBasic* s = ev->GetSyscall();
 			//if fork returns 0 we wait for the second BP in order to get the child
 			if (regs->cr3 != s->GetDtb() && s->GetNr() == 56)
@@ -1026,6 +1039,8 @@ namespace libvmtrace
 			if (entry.path.find(p.GetName()) != string::npos)
 			{
 				va = entry.start + offset;
+				// https://elixir.bootlin.com/linux/latest/source/fs/proc/task_mmu.c#L286
+				va -= entry.pg_off << 12;
 				break;
 			}
 		}
