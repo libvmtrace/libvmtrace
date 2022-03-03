@@ -14,6 +14,7 @@ Libvmtrace was used for the following research papers:
 * VMIGuard: Detecting and Preventing Service Integrity Violations by Malicious Insiders Using Virtual Machine Introspection
 * Agent-Based File Extraction Using Virtual Machine Introspection
 * RapidVMI: Fast and multi-core aware active virtual machine introspection
+* SSHKex: Leveraging virtual machine introspection for extracting SSH keys and decrypting SSH network traffic
 
 [![Build status](https://travis-ci.org/libvmtrace/libvmtrace.svg?branch=master)](https://travis-ci.org/libvmtrace/libvmtrace)
 
